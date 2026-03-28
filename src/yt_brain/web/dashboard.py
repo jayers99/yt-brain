@@ -145,7 +145,8 @@ TEMPLATE = """
         .eng-LIKED .num { color: #22c55e; }
         .eng-CURATED .num { color: #6366f1; }
         .video-list { max-height: 1000px; overflow-y: auto; }
-        #videoTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
+        #videoTable thead tr:first-child th { position: sticky; top: 0; background: #1a1a1a; z-index: 2; }
+        #videoTable thead tr:last-child th { position: sticky; top: 45px; background: #1a1a1a; z-index: 1; }
         #genreTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
         #channelTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
         .duration { color: #888; font-variant-numeric: tabular-nums; }
@@ -268,13 +269,16 @@ TEMPLATE = """
 
         <div class="card full-width">
             <h2>All Videos</h2>
-            <div style="display:flex;gap:12px;margin-bottom:12px">
-                <input type="text" id="titleSearch" placeholder="Search titles..." oninput="applyFilters()" style="flex:1;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'">
-                <input type="text" id="channelSearch" placeholder="Search channels..." oninput="applyFilters()" style="flex:1;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'">
-            </div>
             <div class="video-list">
                 <table id="videoTable">
-                    <thead><tr><th>Title</th><th>Channel</th><th>Genre</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th style="padding-bottom:12px"><input type="text" id="titleSearch" placeholder="Search titles..." oninput="scheduleFilter()" style="width:100%;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'"></th>
+                            <th style="padding-bottom:12px"><input type="text" id="channelSearch" placeholder="Search channels..." oninput="scheduleFilter()" style="width:100%;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'"></th>
+                            <th></th>
+                        </tr>
+                        <tr><th>Title</th><th>Channel</th><th>Genre</th></tr>
+                    </thead>
                     <tbody>
                     {% for v in videos %}
                     <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}">
@@ -295,6 +299,36 @@ TEMPLATE = """
 
         let starFilterActive = false;
 
+        // Pre-cache video data from DOM once — avoids DOM reads in filter loop
+        const videoRows = document.querySelectorAll('#videoTable tbody tr');
+        const videoData = Array.from(videoRows).map(row => ({
+            row,
+            genre: row.dataset.genre,
+            watchedTs: row.dataset.watched ? new Date(row.dataset.watched).getTime() : null,
+            title: (row.children[0]?.textContent || '').toLowerCase(),
+            channel: row.children[1]?.textContent || '',
+            channelLower: (row.children[1]?.textContent || '').toLowerCase(),
+        }));
+
+        // Cache DOM refs
+        const yearFilterEl = document.getElementById('yearFilter');
+        const titleSearchEl = document.getElementById('titleSearch');
+        const channelSearchEl = document.getElementById('channelSearch');
+        const selectAllCb = document.getElementById('genreSelectAll');
+        const filteredCountEl = document.getElementById('filteredCount');
+        const dateRangeEl = document.getElementById('dateRangeLabel');
+        const statNumbers = document.querySelectorAll('.stat-box .number');
+        const genreTbody = document.querySelector('#genreTable tbody');
+        const channelTbody = document.getElementById('channelTable')?.querySelector('tbody');
+        const genreCheckboxes = document.querySelectorAll('.genre-cb');
+
+        // Debounce for text inputs
+        let filterRafId = null;
+        function scheduleFilter() {
+            if (filterRafId) cancelAnimationFrame(filterRafId);
+            filterRafId = requestAnimationFrame(applyFilters);
+        }
+
         function toggleStarFilter() {
             starFilterActive = !starFilterActive;
             document.getElementById('starFilter').classList.toggle('starred', starFilterActive);
@@ -314,77 +348,65 @@ TEMPLATE = """
         }
 
         function toggleAllGenres(checked) {
-            document.querySelectorAll('.genre-cb').forEach(cb => cb.checked = checked);
+            genreCheckboxes.forEach(cb => cb.checked = checked);
             applyFilters();
         }
 
-        function getSelectedGenres() {
-            const cbs = document.querySelectorAll('.genre-cb:checked');
-            return new Set(Array.from(cbs).map(cb => cb.value));
-        }
-
         function applyFilters() {
-            const days = document.getElementById('yearFilter').value;
-            const now = new Date();
-            let cutoff = null;
+            filterRafId = null;
+            const days = yearFilterEl.value;
+            let cutoffTs = null;
             if (days !== 'all') {
-                cutoff = new Date(now.getTime() - parseInt(days) * 24 * 60 * 60 * 1000);
+                cutoffTs = Date.now() - parseInt(days) * 86400000;
             }
 
-            const searchTerm = (document.getElementById('titleSearch').value || '').toLowerCase();
-            const selectedGenres = getSelectedGenres();
-            const allCbs = document.querySelectorAll('.genre-cb');
-            const selectAllCb = document.getElementById('genreSelectAll');
-            selectAllCb.checked = selectedGenres.size === allCbs.length;
-            selectAllCb.indeterminate = selectedGenres.size > 0 && selectedGenres.size < allCbs.length;
+            const searchTerm = titleSearchEl.value.toLowerCase();
+            const channelTerm = channelSearchEl.value.toLowerCase();
+            const selectedGenres = new Set();
+            let checkedCount = 0;
+            genreCheckboxes.forEach(cb => {
+                if (cb.checked) { selectedGenres.add(cb.value); checkedCount++; }
+            });
+            selectAllCb.checked = checkedCount === genreCheckboxes.length;
+            selectAllCb.indeterminate = checkedCount > 0 && checkedCount < genreCheckboxes.length;
 
-            const rows = document.querySelectorAll('#videoTable tbody tr');
             const genreCounts = {};
             const channelCounts = {};
             let visibleCount = 0;
-            let minDate = null, maxDate = null;
+            let minTs = Infinity, maxTs = -Infinity;
 
-            rows.forEach(row => {
-                const watched = row.dataset.watched;
-                const genre = row.dataset.genre;
-                const channel = row.children[1]?.textContent || '';
+            for (let i = 0, len = videoData.length; i < len; i++) {
+                const v = videoData[i];
 
-                let dateOk = true;
-                if (cutoff && watched) {
-                    dateOk = new Date(watched) >= cutoff;
-                } else if (cutoff && !watched) {
-                    dateOk = false;
-                }
+                const dateOk = cutoffTs === null
+                    ? true
+                    : (v.watchedTs !== null && v.watchedTs >= cutoffTs);
 
-                const genreOk = selectedGenres.has(genre);
-                const title = (row.children[0]?.textContent || '').toLowerCase();
-                const channelTerm = (document.getElementById('channelSearch').value || '').toLowerCase();
-                const searchOk = !searchTerm || title.includes(searchTerm);
-                const channelOk = !channelTerm || channel.toLowerCase().includes(channelTerm);
-                const starOk = !starFilterActive || starredChannels.has(channel);
-                const visible = dateOk && genreOk && searchOk && channelOk && starOk;
-                row.style.display = visible ? '' : 'none';
-
-                // Genre counts: all filters except genre checkbox
+                const searchOk = !searchTerm || v.title.includes(searchTerm);
+                const channelOk = !channelTerm || v.channelLower.includes(channelTerm);
+                const starOk = !starFilterActive || starredChannels.has(v.channel);
+                const genreOk = selectedGenres.has(v.genre);
                 const passesNonGenre = dateOk && searchOk && channelOk && starOk;
+                const visible = passesNonGenre && genreOk;
+
+                v.row.style.display = visible ? '' : 'none';
+
                 if (passesNonGenre) {
-                    genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+                    genreCounts[v.genre] = (genreCounts[v.genre] || 0) + 1;
                 }
 
-                // Channel counts & stats: all filters
                 if (visible) {
                     visibleCount++;
-                    if (channel) channelCounts[channel] = (channelCounts[channel] || 0) + 1;
-                    if (watched) {
-                        const d = new Date(watched);
-                        if (!minDate || d < minDate) minDate = d;
-                        if (!maxDate || d > maxDate) maxDate = d;
+                    if (v.channel) channelCounts[v.channel] = (channelCounts[v.channel] || 0) + 1;
+                    if (v.watchedTs !== null) {
+                        if (v.watchedTs < minTs) minTs = v.watchedTs;
+                        if (v.watchedTs > maxTs) maxTs = v.watchedTs;
                     }
                 }
-            });
+            }
 
-            // Update genre counts and re-sort by count desc, Other last
-            const genreRows = Array.from(document.querySelectorAll('#genreTable tbody tr'));
+            // Update genre counts and re-sort
+            const genreRows = Array.from(genreTbody.children);
             const totalForPct = Object.values(genreCounts).reduce((a,b)=>a+b, 0);
             genreRows.forEach(tr => {
                 const genre = tr.children[1]?.textContent;
@@ -404,43 +426,41 @@ TEMPLATE = """
                 if (bGenre === 'Other') return -1;
                 return (genreCounts[bGenre] || 0) - (genreCounts[aGenre] || 0);
             });
-            const genreTbody = document.querySelector('#genreTable tbody');
-            genreRows.forEach(tr => genreTbody.appendChild(tr));
+            const frag = document.createDocumentFragment();
+            genreRows.forEach(tr => frag.appendChild(tr));
+            genreTbody.appendChild(frag);
 
             // Update stats
-            document.getElementById('filteredCount').textContent = visibleCount;
+            filteredCountEl.textContent = visibleCount;
+            statNumbers[0].textContent = visibleCount;
+            statNumbers[1].textContent = Object.keys(channelCounts).length;
+            statNumbers[2].textContent = Object.keys(genreCounts).length;
 
-            const statBoxes = document.querySelectorAll('.stat-box .number');
-            statBoxes[0].textContent = visibleCount; // Total Videos
-            statBoxes[1].textContent = Object.keys(channelCounts).length; // Channels
-            statBoxes[2].textContent = Object.keys(genreCounts).length; // Genres
-
-            // Top genre
             let topGenre = '-';
             let topCount = 0;
-            for (const [g, c] of Object.entries(genreCounts)) {
-                if (c > topCount) { topCount = c; topGenre = g; }
+            for (const g in genreCounts) {
+                if (genreCounts[g] > topCount) { topCount = genreCounts[g]; topGenre = g; }
             }
-            statBoxes[3].textContent = topGenre;
+            statNumbers[3].textContent = topGenre;
 
             // Date range
-            const fmt = d => d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-            const rangeEl = document.getElementById('dateRangeLabel');
-            if (minDate && maxDate) {
-                rangeEl.textContent = minDate.toDateString() === maxDate.toDateString()
-                    ? fmt(minDate) : fmt(minDate) + ' — ' + fmt(maxDate);
+            if (minTs !== Infinity && maxTs !== -Infinity) {
+                const fmt = d => d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+                const minD = new Date(minTs), maxD = new Date(maxTs);
+                dateRangeEl.textContent = minD.toDateString() === maxD.toDateString()
+                    ? fmt(minD) : fmt(minD) + ' — ' + fmt(maxD);
             } else {
-                rangeEl.textContent = '-';
+                dateRangeEl.textContent = '-';
             }
 
             // Update channel breakdown table
-            const chBody = document.getElementById('channelTable')?.querySelector('tbody');
-            if (chBody) {
+            if (channelTbody) {
+                const entries = Object.entries(channelCounts);
                 const filtered = starFilterActive
-                    ? Object.entries(channelCounts).filter(([name]) => starredChannels.has(name))
-                    : Object.entries(channelCounts);
-                const sorted = filtered.sort((a,b) => b[1]-a[1]);
-                chBody.innerHTML = sorted.map(([name, count]) => {
+                    ? entries.filter(([name]) => starredChannels.has(name))
+                    : entries;
+                filtered.sort((a,b) => b[1]-a[1]);
+                channelTbody.innerHTML = filtered.map(([name, count]) => {
                     const pct = visibleCount ? (count / visibleCount * 100).toFixed(1) : 0;
                     const url = channelUrls[name] || `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
                     const starred = starredChannels.has(name) ? ' starred' : '';
