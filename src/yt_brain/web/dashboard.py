@@ -184,10 +184,14 @@ TEMPLATE = """
         &nbsp;
         <select id="yearFilter" onchange="applyFilters()" style="background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;">
             <option value="all">All time</option>
-            <option value="1">Last 1 year</option>
-            <option value="2">Last 2 years</option>
-            <option value="3">Last 3 years</option>
-            <option value="5">Last 5 years</option>
+            <option value="1">Last 1 day</option>
+            <option value="7">Last 1 week</option>
+            <option value="30">Last 1 month</option>
+            <option value="182">Last 6 months</option>
+            <option value="365">Last 1 year</option>
+            <option value="730">Last 2 years</option>
+            <option value="1095">Last 3 years</option>
+            <option value="1825">Last 5 years</option>
         </select>
     </p>
 
@@ -320,12 +324,11 @@ TEMPLATE = """
         }
 
         function applyFilters() {
-            const years = document.getElementById('yearFilter').value;
+            const days = document.getElementById('yearFilter').value;
             const now = new Date();
             let cutoff = null;
-            if (years !== 'all') {
-                cutoff = new Date(now);
-                cutoff.setFullYear(cutoff.getFullYear() - parseInt(years));
+            if (days !== 'all') {
+                cutoff = new Date(now.getTime() - parseInt(days) * 24 * 60 * 60 * 1000);
             }
 
             const searchTerm = (document.getElementById('titleSearch').value || '').toLowerCase();
