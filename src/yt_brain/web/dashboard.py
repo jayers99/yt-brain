@@ -21,22 +21,57 @@ TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>yt-brain Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
+        :root {
+            --bg-base: #0c0c0e;
+            --bg-surface: #141418;
+            --bg-elevated: #1a1a20;
+            --bg-hover: #22222a;
+            --border-subtle: #25252d;
+            --border-default: #2e2e38;
+            --text-primary: #f0f0f4;
+            --text-secondary: #a0a0b0;
+            --text-tertiary: #6a6a7a;
+            --text-muted: #50505e;
+            --accent: #6366f1;
+            --accent-dim: #4f46e5;
+            --accent-glow: rgba(99, 102, 241, 0.15);
+            --accent-glow-strong: rgba(99, 102, 241, 0.25);
+            --star-color: #f59e0b;
+            --link-primary: #8b8bf5;
+            --link-channel: #7a7a8e;
+            --font-display: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+            --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            background: #0f0f0f;
-            color: #e0e0e0;
-            padding: 24px;
+            font-family: var(--font-body);
+            background: var(--bg-base);
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.05), transparent),
+                linear-gradient(180deg, #0c0c0e 0%, #0e0e12 100%);
+            color: var(--text-secondary);
+            padding: 32px 40px;
+            min-height: 100vh;
         }
         h1 {
-            font-size: 28px;
+            font-family: var(--font-display);
+            font-size: 22px;
             font-weight: 700;
-            margin-bottom: 8px;
-            color: #fff;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
         }
-        .subtitle { color: #888; margin-bottom: 32px; font-size: 14px; }
+        .subtitle {
+            color: var(--text-tertiary);
+            margin-bottom: 32px;
+            font-size: 13px;
+            letter-spacing: 0.2px;
+        }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -45,49 +80,93 @@ TEMPLATE = """
             align-items: stretch;
         }
         .card {
-            background: #1a1a1a;
+            background: var(--bg-surface);
             border-radius: 12px;
             padding: 24px;
-            border: 1px solid #2a2a2a;
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
             display: flex;
             flex-direction: column;
             max-height: 500px;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+            border-color: var(--border-default);
         }
         .card h2 {
-            font-size: 16px;
-            font-weight: 600;
+            font-family: var(--font-display);
+            font-size: 11px;
+            font-weight: 500;
             margin-bottom: 16px;
-            color: #ccc;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
         }
         .stat-row {
             display: flex;
-            gap: 24px;
-            margin-bottom: 32px;
+            gap: 20px;
+            margin-bottom: 24px;
+            padding-bottom: 28px;
+            border-bottom: 1px solid var(--border-subtle);
         }
         .stat-box {
-            background: #1a1a1a;
+            background: var(--bg-surface);
             border-radius: 12px;
-            padding: 20px 28px;
-            border: 1px solid #2a2a2a;
+            padding: 22px 28px;
+            border: 1px solid var(--border-subtle);
             text-align: center;
+            box-shadow:
+                0 2px 8px rgba(0,0,0,0.2),
+                inset 0 1px 0 rgba(255,255,255,0.03);
+            background-image: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+            position: relative;
+            overflow: hidden;
+            transition: box-shadow 0.25s ease, transform 0.2s ease;
+        }
+        .stat-box::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            padding: 1px;
+            background: linear-gradient(135deg, var(--accent-glow), transparent 60%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+        .stat-box:hover {
+            box-shadow:
+                0 4px 16px rgba(0,0,0,0.3),
+                0 0 20px var(--accent-glow);
+            transform: translateY(-1px);
         }
         .stat-box .number {
-            font-size: 36px;
-            font-weight: 700;
-            color: #fff;
+            font-family: var(--font-display);
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -1px;
+            transition: color 0.3s ease;
         }
         .stat-box .label {
-            font-size: 12px;
-            color: #888;
+            font-size: 10px;
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 4px;
+            letter-spacing: 1.5px;
+            margin-top: 6px;
+            font-weight: 500;
         }
         .chart-container {
             position: relative;
             height: 350px;
         }
         .full-width { grid-column: 1 / -1; }
+        .card.card-primary {
+            border-top: 2px solid var(--accent);
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.03) 0%, var(--bg-surface) 80px);
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -96,24 +175,32 @@ TEMPLATE = """
         th {
             text-align: left;
             padding: 8px 12px;
-            border-bottom: 1px solid #333;
-            color: #888;
+            border-bottom: 1px solid var(--border-default);
+            color: var(--text-muted);
+            font-family: var(--font-display);
             font-weight: 500;
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
         }
         td {
             padding: 8px 12px;
-            border-bottom: 1px solid #1f1f1f;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
         }
-        tr:hover td { background: #222; }
+        tr {
+            transition: background 0.15s ease;
+        }
+        tr:hover td { background: var(--bg-hover); }
+        #videoTable tbody tr {
+            transition: opacity 0.2s ease, background 0.15s ease;
+        }
         .genre-badge {
             display: inline-block;
-            padding: 2px 10px;
-            border-radius: 12px;
+            padding: 3px 12px;
+            border-radius: 6px;
             font-size: 11px;
-            font-weight: 500;
+            font-weight: 600;
+            letter-spacing: 0.3px;
         }
         .bar-cell {
             display: flex;
@@ -121,11 +208,19 @@ TEMPLATE = """
             gap: 8px;
         }
         .bar {
-            height: 8px;
-            border-radius: 4px;
-            background: #6366f1;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--accent);
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 6px var(--accent-glow);
         }
-        .bar-label { font-size: 12px; color: #888; min-width: 45px; text-align: right; }
+        .bar-label {
+            font-family: var(--font-display);
+            font-size: 11px;
+            color: var(--text-muted);
+            min-width: 45px;
+            text-align: right;
+        }
         .engagement-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -135,27 +230,39 @@ TEMPLATE = """
             text-align: center;
             padding: 16px 8px;
             border-radius: 8px;
-            background: #222;
+            background: var(--bg-hover);
         }
-        .eng-box .num { font-size: 24px; font-weight: 700; }
-        .eng-box .lbl { font-size: 10px; color: #888; text-transform: uppercase; margin-top: 4px; }
+        .eng-box .num { font-family: var(--font-display); font-size: 24px; font-weight: 700; }
+        .eng-box .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
         .eng-UNKNOWN .num { color: #6b7280; }
         .eng-BOUNCED .num { color: #ef4444; }
         .eng-WATCHED .num { color: #f59e0b; }
         .eng-LIKED .num { color: #22c55e; }
-        .eng-CURATED .num { color: #6366f1; }
+        .eng-CURATED .num { color: var(--accent); }
         .video-list { max-height: 1000px; overflow-y: auto; }
         #videoTable { table-layout: fixed; }
         #videoTable col.col-title { width: 55%; }
         #videoTable col.col-channel { width: 25%; }
         #videoTable col.col-genre { width: 20%; }
         #videoTable td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #videoTable thead tr:first-child th { position: sticky; top: 0; background: #1a1a1a; z-index: 2; }
-        #videoTable thead tr:last-child th { position: sticky; top: 45px; background: #1a1a1a; z-index: 1; }
-        #genreTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
-        #channelTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
-        .duration { color: #888; font-variant-numeric: tabular-nums; }
-        .channel { color: #6b7280; }
+        #videoTable thead tr:first-child th { position: sticky; top: 0; background: var(--bg-surface); z-index: 2; }
+        #videoTable thead tr:last-child th { position: sticky; top: 45px; background: var(--bg-surface); z-index: 1; }
+        #genreTable thead th { position: sticky; top: 0; background: var(--bg-surface); z-index: 1; }
+        #channelTable thead th { position: sticky; top: 0; background: var(--bg-surface); z-index: 1; }
+        .duration { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .channel { color: var(--link-channel); }
+        .link-title {
+            color: var(--link-primary);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .link-title:hover { color: #a5a5ff; }
+        .link-channel {
+            color: var(--link-channel);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .link-channel:hover { color: var(--text-secondary); }
         .filter-bar {
             display: flex;
             gap: 8px;
@@ -165,28 +272,63 @@ TEMPLATE = """
         .filter-btn {
             padding: 4px 14px;
             border-radius: 16px;
-            border: 1px solid #333;
+            border: 1px solid var(--border-default);
             background: transparent;
-            color: #ccc;
+            color: var(--text-secondary);
             cursor: pointer;
             font-size: 12px;
             transition: all 0.15s;
         }
-        input[type="checkbox"] { accent-color: #6366f1; cursor: pointer; }
-        .star-btn { cursor: pointer; font-size: 16px; color: #444; transition: color 0.15s; }
-        .star-btn:hover { color: #f59e0b; }
-        .star-btn.starred { color: #f59e0b; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1a1a1a; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-        * { scrollbar-width: thin; scrollbar-color: #333 #1a1a1a; }
+        input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+        .star-btn { cursor: pointer; font-size: 16px; color: var(--text-muted); transition: color 0.2s ease, transform 0.15s ease; }
+        .star-btn:hover { color: var(--star-color); transform: scale(1.15); }
+        .star-btn.starred { color: var(--star-color); }
+        .year-filter {
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-default);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 13px;
+            font-family: var(--font-body);
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        .year-filter:focus { border-color: var(--accent); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        * { scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; }
         .search-wrap { position: relative; }
-        .search-input { width:100%;padding:8px 28px 8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none; }
-        .search-input:focus { border-color: #6366f1; }
-        .clear-btn { position:absolute;right:8px;top:50%;transform:translateY(-50%);color:#555;cursor:pointer;font-size:16px;line-height:1;display:none; }
-        .clear-btn:hover { color:#ccc; }
+        .search-input {
+            width: 100%;
+            padding: 8px 28px 8px 12px;
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: var(--font-body);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .search-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+        .clear-btn { position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1;display:none;transition:color 0.15s ease; }
+        .clear-btn:hover { color:var(--text-secondary); }
         .search-wrap .search-input:not(:placeholder-shown) + .clear-btn { display:block; }
+        #genreTable tbody tr {
+            border-left: 3px solid transparent;
+            transition: border-color 0.2s ease, background 0.15s ease;
+        }
+        #genreTable tbody tr:hover {
+            border-left-color: var(--accent);
+        }
+        .card-scroll { overflow-y: auto; flex: 1; }
     </style>
 </head>
 <body>
@@ -194,7 +336,7 @@ TEMPLATE = """
     <p class="subtitle">
         <span id="filteredCount">{{ total_videos }}</span> videos from your YouTube history &middot; <span id="dateRangeLabel">{{ date_range }}</span>
         &nbsp;
-        <select id="yearFilter" onchange="applyFilters()" style="background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;">
+        <select id="yearFilter" onchange="applyFilters()" class="year-filter">
             <option value="all">All time</option>
             <option value="1">Last 1 day</option>
             <option value="7">Last 1 week</option>
@@ -229,7 +371,7 @@ TEMPLATE = """
     <div class="grid">
         <div class="card">
             <h2>Genre Breakdown</h2>
-            <div style="overflow-y:auto;flex:1">
+            <div class="card-scroll">
             <table id="genreTable">
                 <thead><tr>
                     <th style="width:28px"><input type="checkbox" id="genreSelectAll" checked onchange="toggleAllGenres(this.checked)" title="Select all / none"></th>
@@ -256,14 +398,14 @@ TEMPLATE = """
 
         <div class="card">
             <h2>Channel Breakdown</h2>
-            <div style="overflow-y:auto;flex:1">
+            <div class="card-scroll">
             <table id="channelTable">
                 <thead><tr><th style="width:28px"><span id="starFilter" class="star-btn" onclick="toggleStarFilter()" title="Show starred only">&#9733;</span></th><th>Channel</th><th>Count</th><th></th></tr></thead>
                 <tbody>
                 {% for c in channel_stats %}
                 <tr>
                     <td><span class="star-btn{% if c.starred %} starred{% endif %}" onclick="toggleStar(this, '{{ c.name | e }}')" title="Star channel">&#9733;</span></td>
-                    <td><a href="{{ c.url or 'https://www.youtube.com/results?search_query=' + c.name|urlencode }}" target="_blank" style="color:#8b8bf5;text-decoration:none">{{ c.name }}</a></td>
+                    <td><a href="{{ c.url or 'https://www.youtube.com/results?search_query=' + c.name|urlencode }}" target="_blank" class="link-title">{{ c.name }}</a></td>
                     <td>{{ c.count }}</td>
                     <td>
                         <div class="bar-cell">
@@ -278,7 +420,7 @@ TEMPLATE = """
             </div>
         </div>
 
-        <div class="card full-width">
+        <div class="card card-primary full-width">
             <h2>All Videos</h2>
             <div class="video-list">
                 <table id="videoTable">
@@ -298,8 +440,8 @@ TEMPLATE = """
                     <tbody>
                     {% for v in videos %}
                     <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}">
-                        <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" style="color:#8b8bf5;text-decoration:none">{{ v.title[:65] }}</a></td>
-                        <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" style="color:#6b7280;text-decoration:none">{{ v.channel[:20] }}</a></td>
+                        <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title[:65] }}</a></td>
+                        <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
                     </tr>
                     {% endfor %}
@@ -488,7 +630,7 @@ TEMPLATE = """
                     const url = channelUrls[name] || `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
                     const starred = starredChannels.has(name) ? ' starred' : '';
                     const eName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">&#9733;</span></td><td><a href="${url}" target="_blank" style="color:#8b8bf5;text-decoration:none">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar" style="width:${pct*2}px"></div><span class="bar-label">${pct}%</span></div></td></tr>`;
+                    return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">&#9733;</span></td><td><a href="${url}" target="_blank" class="link-title">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar" style="width:${pct*2}px"></div><span class="bar-label">${pct}%</span></div></td></tr>`;
                 }).join('');
             }
         }
