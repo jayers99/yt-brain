@@ -245,7 +245,7 @@ def fetch(
         update_channel_id,
         update_watched_at,
     )
-    from yt_brain.infrastructure.ytdlp_adapter import _fetch_history_range, parse_ytdlp_metadata
+    from yt_brain.infrastructure.ytdlp_adapter import fetch_history_range, parse_ytdlp_metadata
 
     match = re.match(r"^(\d+)\s*yr$", period.strip())
     if not match:
@@ -274,7 +274,7 @@ def fetch(
         console.print(f"[dim]Fetching videos {start}-{end}...[/dim]")
 
         try:
-            entries = _fetch_history_range(start, end, browser)
+            entries = fetch_history_range(start, end, browser)
         except Exception as e:
             err_console.print(f"[red]Error: {e}[/red]")
             break

@@ -98,7 +98,7 @@ def fetch_history(
     return entries
 
 
-def _fetch_history_range(
+def fetch_history_range(
     start: int,
     end: int,
     browser: str = "chrome",
