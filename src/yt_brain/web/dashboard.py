@@ -145,6 +145,11 @@ TEMPLATE = """
         .eng-LIKED .num { color: #22c55e; }
         .eng-CURATED .num { color: #6366f1; }
         .video-list { max-height: 1000px; overflow-y: auto; }
+        #videoTable { table-layout: fixed; }
+        #videoTable col.col-title { width: 55%; }
+        #videoTable col.col-channel { width: 25%; }
+        #videoTable col.col-genre { width: 20%; }
+        #videoTable td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #videoTable thead tr:first-child th { position: sticky; top: 0; background: #1a1a1a; z-index: 2; }
         #videoTable thead tr:last-child th { position: sticky; top: 45px; background: #1a1a1a; z-index: 1; }
         #genreTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
@@ -277,6 +282,11 @@ TEMPLATE = """
             <h2>All Videos</h2>
             <div class="video-list">
                 <table id="videoTable">
+                    <colgroup>
+                        <col class="col-title">
+                        <col class="col-channel">
+                        <col class="col-genre">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="titleSearch" placeholder="Search titles..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('titleSearch')">&times;</span></div></th>
