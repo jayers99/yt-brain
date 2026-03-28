@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from yt_brain.application.backfill import backfill_categories, backfill_channels, backfill_dates
-from yt_brain.infrastructure.database import get_existing_video_ids, save_video
+from yt_brain.infrastructure.database import get_existing_video_ids, save_video, update_watched_at
 from yt_brain.infrastructure.ytdlp_adapter import fetch_history_range, parse_ytdlp_metadata
 
 
 @dataclass
 class SyncResult:
     new_videos: int
+    rewatched_videos: int
     channels_backfilled: int
     categories_backfilled: int
     dates_backfilled: int
@@ -25,11 +27,14 @@ def sync_videos(
     """Fetch recent YouTube history and add new videos to the database.
 
     Fetches in batches. Stops when an entire batch consists of videos
-    already in the database. Backfills channels, categories, and dates
-    for newly added videos.
+    already in the database with no position change (i.e. no re-watches).
+    Updates watched_at for re-watched videos that appear near the top
+    of the history feed.
     """
     all_new_ids: list[str] = []
+    rewatched_ids: list[str] = []
     start = 1
+    now = datetime.now(timezone.utc)
 
     while True:
         end = start + batch_size - 1
@@ -42,6 +47,17 @@ def sync_videos(
         batch_ids = [e.get("id", "") for e in entries if e.get("id")]
         existing = get_existing_video_ids(db_path, batch_ids)
         new_ids = [vid for vid in batch_ids if vid not in existing]
+
+        # Update watched_at for re-watched videos in the first batch.
+        # History is ordered most-recent-first, so existing videos near
+        # the top have been re-watched and need their timestamp updated.
+        # Assign decreasing timestamps (1 second apart) to preserve order.
+        if start == 1:
+            for i, vid_id in enumerate(batch_ids):
+                if vid_id in existing:
+                    ts = (now - timedelta(seconds=i)).isoformat()
+                    update_watched_at(db_path, vid_id, ts)
+                    rewatched_ids.append(vid_id)
 
         if not new_ids:
             # Entire batch already known — stop
@@ -67,6 +83,7 @@ def sync_videos(
 
     return SyncResult(
         new_videos=len(all_new_ids),
+        rewatched_videos=len(rewatched_ids),
         channels_backfilled=channels_filled,
         categories_backfilled=categories_filled,
         dates_backfilled=dates_filled,

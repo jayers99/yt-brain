@@ -188,13 +188,19 @@ def sync(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    if result.new_videos == 0:
+    if result.new_videos == 0 and result.rewatched_videos == 0:
         console.print("[green]Already up to date.[/green]")
     else:
-        console.print(f"[green]Synced {result.new_videos} new videos[/green]")
-        console.print(f"  Channels backfilled: {result.channels_backfilled}")
-        console.print(f"  Categories backfilled: {result.categories_backfilled}")
-        console.print(f"  Dates backfilled: {result.dates_backfilled}")
+        if result.new_videos:
+            console.print(f"[green]Synced {result.new_videos} new videos[/green]")
+        if result.rewatched_videos:
+            console.print(f"[green]Updated {result.rewatched_videos} re-watched videos[/green]")
+        if result.channels_backfilled:
+            console.print(f"  Channels backfilled: {result.channels_backfilled}")
+        if result.categories_backfilled:
+            console.print(f"  Categories backfilled: {result.categories_backfilled}")
+        if result.dates_backfilled:
+            console.print(f"  Dates backfilled: {result.dates_backfilled}")
 
 
 @app.command("backfill-categories")

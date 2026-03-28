@@ -185,7 +185,7 @@ def update_watched_at(db_path: Path, youtube_id: str, watched_at: str) -> None:
     conn = sqlite3.connect(db_path)
     try:
         conn.execute(
-            "UPDATE videos SET watched_at = ? WHERE youtube_id = ? AND watched_at IS NULL",
+            "UPDATE videos SET watched_at = ?, updated_at = datetime('now') WHERE youtube_id = ?",
             (watched_at, youtube_id),
         )
         conn.commit()
