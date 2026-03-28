@@ -176,6 +176,12 @@ TEMPLATE = """
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
         * { scrollbar-width: thin; scrollbar-color: #333 #1a1a1a; }
+        .search-wrap { position: relative; }
+        .search-input { width:100%;padding:8px 28px 8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none; }
+        .search-input:focus { border-color: #6366f1; }
+        .clear-btn { position:absolute;right:8px;top:50%;transform:translateY(-50%);color:#555;cursor:pointer;font-size:16px;line-height:1;display:none; }
+        .clear-btn:hover { color:#ccc; }
+        .search-wrap .search-input:not(:placeholder-shown) + .clear-btn { display:block; }
     </style>
 </head>
 <body>
@@ -273,8 +279,8 @@ TEMPLATE = """
                 <table id="videoTable">
                     <thead>
                         <tr>
-                            <th style="padding-bottom:12px"><input type="text" id="titleSearch" placeholder="Search titles..." oninput="scheduleFilter()" style="width:100%;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'"></th>
-                            <th style="padding-bottom:12px"><input type="text" id="channelSearch" placeholder="Search channels..." oninput="scheduleFilter()" style="width:100%;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'"></th>
+                            <th style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="titleSearch" placeholder="Search titles..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('titleSearch')">&times;</span></div></th>
+                            <th style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="channelSearch" placeholder="Search channels..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('channelSearch')">&times;</span></div></th>
                             <th></th>
                         </tr>
                         <tr><th>Title</th><th>Channel</th><th>Genre</th></tr>
@@ -324,6 +330,13 @@ TEMPLATE = """
 
         // Debounce for text inputs
         let filterRafId = null;
+        function clearInput(id) {
+            const el = document.getElementById(id);
+            el.value = '';
+            el.focus();
+            applyFilters();
+        }
+
         function scheduleFilter() {
             if (filterRafId) cancelAnimationFrame(filterRafId);
             filterRafId = requestAnimationFrame(applyFilters);
