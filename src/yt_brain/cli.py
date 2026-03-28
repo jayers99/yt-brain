@@ -177,12 +177,16 @@ def sync(
 
     console.print(f"[dim]Syncing YouTube history ({browser} cookies)...[/dim]")
 
-    result = sync_videos(
-        db_path=db_path,
-        browser=browser,
-        batch_size=batch_size,
-        api_key=config.youtube_api_key or None,
-    )
+    try:
+        result = sync_videos(
+            db_path=db_path,
+            browser=browser,
+            batch_size=batch_size,
+            api_key=config.youtube_api_key or None,
+        )
+    except Exception as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
     if result.new_videos == 0:
         console.print("[green]Already up to date.[/green]")
