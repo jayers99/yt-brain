@@ -16,14 +16,16 @@ uv sync
 # Import watch history from Google Takeout (zip or directory)
 yt-brain ingest takeout ~/Downloads/takeout-*.zip
 
-# Backfill channel names (uses YouTube oEmbed API)
+# Backfill metadata (channel names, categories, dates)
 yt-brain backfill-channels
-
-# Backfill video dates (requires YouTube Data API key)
+yt-brain backfill-categories
 yt-brain backfill-dates
 
 # Launch the interactive dashboard
 yt-brain dashboard
+
+# Keep data current (fetches new videos from YouTube history)
+yt-brain sync
 ```
 
 ## Commands
@@ -34,12 +36,14 @@ yt-brain dashboard
 | `ingest video <url>` | Add a single video by URL |
 | `history [-n 50] [--save]` | Browse recent watch history via yt-dlp |
 | `fetch <period>` | Fetch history for a time period (e.g. `1yr`, `2yr`) |
+| `sync [--browser chrome]` | Fetch and add new videos since last sync |
 | `classify [--reclassify]` | Run engagement classification |
 | `review [--level <tier>]` | Interactive review by engagement tier |
 | `status` | Show video counts by engagement tier |
 | `transcript <video_id>` | Fetch transcript via yt-dlp |
 | `backfill-channels` | Fill missing channel names via oEmbed |
 | `backfill-dates` | Fill missing dates via YouTube Data API |
+| `backfill-categories` | Fill missing categories via YouTube Data API |
 | `dashboard [--port 5555]` | Launch web dashboard |
 | `config` | Show current configuration |
 
@@ -50,7 +54,7 @@ The web dashboard provides:
 - **Genre Breakdown** with checkboxes to filter by genre
 - **Channel Breakdown** with clickable links to YouTube
 - **All Videos** table with title and channel search
-- **Year filter** dropdown (1yr, 2yr, 3yr, 5yr, all)
+- **Time filter** dropdown (1 day, 1 week, 1 month, 6 months, 1-5 years, all)
 - **Date range** display based on actual watch dates
 
 All filters combine — select a year range, check specific genres, and search by title or channel simultaneously.
@@ -75,7 +79,7 @@ All filters combine — select a year range, check specific genres, and search b
 
 ### YouTube Data API Key (optional)
 
-Required for `backfill-dates` and `fetch` commands.
+Required for `backfill-dates`, `backfill-categories`, `fetch`, and `sync` (for category/date enrichment).
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
 2. Enable the YouTube Data API v3
