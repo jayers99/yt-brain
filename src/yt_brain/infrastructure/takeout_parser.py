@@ -83,7 +83,7 @@ def _parse_watch_entry(entry: dict) -> Video | None:
     return Video(
         youtube_id=video_id,
         title=title,
-        channel_id=channel_id or channel_name,
+        channel_id=channel_name or channel_id,
         duration_seconds=duration_seconds,
         watched_seconds=watched_seconds,
         watched_at=watched_at,

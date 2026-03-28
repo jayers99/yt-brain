@@ -139,6 +139,52 @@ def save_channel(db_path: Path, channel_id: str, name: str, url: str = "", subsc
         conn.close()
 
 
+def get_videos_missing_channel(db_path: Path) -> list[tuple[str, str]]:
+    """Return (youtube_id, title) for videos with empty channel_id."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute(
+            "SELECT youtube_id, title FROM videos WHERE channel_id = '' OR channel_id IS NULL"
+        )
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+
+def update_channel_id(db_path: Path, youtube_id: str, channel_id: str) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE videos SET channel_id = ?, updated_at = datetime('now') WHERE youtube_id = ?",
+            (channel_id, youtube_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_videos_missing_watched_at(db_path: Path) -> list[str]:
+    """Return youtube_ids for videos with no watched_at date."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("SELECT youtube_id FROM videos WHERE watched_at IS NULL")
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def update_watched_at(db_path: Path, youtube_id: str, watched_at: str) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE videos SET watched_at = ? WHERE youtube_id = ? AND watched_at IS NULL",
+            (watched_at, youtube_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def is_video_in_playlist(db_path: Path, youtube_id: str) -> bool:
     conn = sqlite3.connect(db_path)
     try:

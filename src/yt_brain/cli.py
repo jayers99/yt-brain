@@ -134,8 +134,155 @@ def history(
             save_video(db_path, video)
             count += 1
         console.print(f"\n[green]Saved {count} videos to database.[/green]")
+
+        # Backfill missing channel names via oEmbed
+        import json as _json
+        import urllib.request
+        from urllib.error import URLError
+
+        from yt_brain.infrastructure.database import get_videos_missing_channel, update_channel_id
+
+        missing = get_videos_missing_channel(db_path)
+        if missing:
+            console.print(f"[dim]Backfilling channel names for {len(missing)} videos...[/dim]")
+            filled = 0
+            for vid_id, _title in missing:
+                try:
+                    url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid_id}&format=json"
+                    resp = urllib.request.urlopen(url, timeout=10)
+                    data = _json.loads(resp.read())
+                    name = data.get("author_name", "")
+                    if name:
+                        update_channel_id(db_path, vid_id, name)
+                        filled += 1
+                except (URLError, _json.JSONDecodeError, TimeoutError):
+                    pass
+            console.print(f"[green]Backfilled {filled}/{len(missing)} channel names.[/green]")
     else:
         console.print(f"\n[dim]Use --save to add these to your brain.[/dim]")
+
+
+@app.command()
+def fetch(
+    period: Annotated[str, typer.Argument(help="How far back to fetch, e.g. 1yr, 2yr, 3yr")],
+    browser: Annotated[str, typer.Option("--browser", "-b", help="Browser to read cookies from")] = "chrome",
+) -> None:
+    """Fetch YouTube watch history for a time period and save to database.
+
+    Fetches in batches of 200, backfills upload dates after each batch,
+    and stops once it hits videos published before the cutoff.
+    """
+    import json as _json
+    import re
+    import urllib.request
+    from datetime import datetime, timedelta, timezone
+    from urllib.error import URLError
+
+    from yt_brain.infrastructure.config import load_config as _load_config
+    from yt_brain.infrastructure.database import (
+        get_videos_missing_channel,
+        save_video,
+        update_channel_id,
+        update_watched_at,
+    )
+    from yt_brain.infrastructure.ytdlp_adapter import _fetch_history_range, parse_ytdlp_metadata
+
+    match = re.match(r"^(\d+)\s*yr$", period.strip())
+    if not match:
+        err_console.print("[red]Format: 1yr, 2yr, 3yr, etc.[/red]")
+        raise typer.Exit(1)
+
+    years = int(match.group(1))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=years * 365)
+    console.print(f"[dim]Fetching watch history back to {cutoff.strftime('%b %Y')}...[/dim]")
+
+    config = _load_config()
+    if not config.youtube_api_key:
+        err_console.print("[red]YouTube API key required for date-based fetching. Run: yt-brain config[/red]")
+        raise typer.Exit(1)
+
+    db_path = _get_db_path()
+    _ensure_db(db_path)
+
+    batch_size = 200
+    start = 1
+    total_saved = 0
+    reached_cutoff = False
+
+    while not reached_cutoff:
+        end = start + batch_size - 1
+        console.print(f"[dim]Fetching videos {start}-{end}...[/dim]")
+
+        try:
+            entries = _fetch_history_range(start, end, browser)
+        except Exception as e:
+            err_console.print(f"[red]Error: {e}[/red]")
+            break
+
+        if not entries:
+            console.print("[dim]No more history entries.[/dim]")
+            break
+
+        # Save videos
+        batch_ids = []
+        for entry in entries:
+            video = parse_ytdlp_metadata(entry)
+            save_video(db_path, video)
+            batch_ids.append(video.youtube_id)
+            total_saved += 1
+
+        # Backfill dates for this batch via YouTube API
+        ids_str = ",".join(batch_ids)
+        try:
+            api_url = (
+                f"https://www.googleapis.com/youtube/v3/videos"
+                f"?part=snippet&id={ids_str}&key={config.youtube_api_key}"
+            )
+            resp = urllib.request.urlopen(api_url, timeout=15)
+            data = _json.loads(resp.read())
+            oldest_in_batch = None
+            for item in data.get("items", []):
+                published = item["snippet"].get("publishedAt", "")
+                if published:
+                    update_watched_at(db_path, item["id"], published)
+                    pub_dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
+                    if oldest_in_batch is None or pub_dt < oldest_in_batch:
+                        oldest_in_batch = pub_dt
+        except (URLError, _json.JSONDecodeError, KeyError) as e:
+            err_console.print(f"[yellow]API error: {e}[/yellow]")
+            oldest_in_batch = None
+
+        if oldest_in_batch:
+            console.print(f"[dim]  Oldest in batch: {oldest_in_batch.strftime('%b %d, %Y')}[/dim]")
+            if oldest_in_batch < cutoff:
+                console.print(f"[green]Reached cutoff ({cutoff.strftime('%b %Y')}).[/green]")
+                reached_cutoff = True
+
+        if len(entries) < batch_size:
+            console.print("[dim]Reached end of history.[/dim]")
+            break
+
+        start += batch_size
+
+    console.print(f"[green]Saved {total_saved} videos.[/green]")
+
+    # Backfill channel names for all missing
+    missing_channels = get_videos_missing_channel(db_path)
+    if missing_channels:
+        console.print(f"[dim]Backfilling channel names for {len(missing_channels)} videos...[/dim]")
+        filled = 0
+        for vid_id, _title in missing_channels:
+            try:
+                url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid_id}&format=json"
+                resp = urllib.request.urlopen(url, timeout=10)
+                data = _json.loads(resp.read())
+                name = data.get("author_name", "")
+                if name:
+                    update_channel_id(db_path, vid_id, name)
+                    filled += 1
+            except (URLError, _json.JSONDecodeError, TimeoutError):
+                pass
+        console.print(f"[green]Backfilled {filled}/{len(missing_channels)} channel names.[/green]")
 
 
 @app.command()
@@ -294,6 +441,89 @@ def config() -> None:
     table.add_row("Transcript language", cfg.transcript_language)
 
     console.print(table)
+
+
+@app.command("backfill-dates")
+def backfill_dates() -> None:
+    """Backfill missing video dates via YouTube Data API."""
+    import json
+    import urllib.request
+    from urllib.error import URLError
+
+    from yt_brain.infrastructure.config import load_config
+    from yt_brain.infrastructure.database import get_videos_missing_watched_at, update_watched_at
+
+    config = load_config()
+    if not config.youtube_api_key:
+        err_console.print("[red]No YouTube API key configured. Run: yt-brain config[/red]")
+        raise typer.Exit(1)
+
+    db_path = config.db_path
+    _ensure_db(db_path)
+
+    missing = get_videos_missing_watched_at(db_path)
+    if not missing:
+        console.print("[green]All videos have dates.[/green]")
+        return
+
+    console.print(f"[dim]Backfilling dates for {len(missing)} videos via YouTube Data API...[/dim]")
+    filled = 0
+    # Process in batches of 50 (API limit)
+    for i in range(0, len(missing), 50):
+        batch = missing[i:i + 50]
+        ids = ",".join(batch)
+        try:
+            api_url = (
+                f"https://www.googleapis.com/youtube/v3/videos"
+                f"?part=snippet&id={ids}&key={config.youtube_api_key}"
+            )
+            resp = urllib.request.urlopen(api_url, timeout=15)
+            data = json.loads(resp.read())
+            for item in data.get("items", []):
+                vid_id = item["id"]
+                published = item["snippet"].get("publishedAt", "")
+                if published:
+                    # Convert ISO 8601 to datetime string
+                    update_watched_at(db_path, vid_id, published)
+                    filled += 1
+        except (URLError, json.JSONDecodeError, KeyError) as e:
+            err_console.print(f"[yellow]Batch error: {e}[/yellow]")
+
+    console.print(f"[green]Backfilled {filled}/{len(missing)} video dates.[/green]")
+
+
+@app.command("backfill-channels")
+def backfill_channels() -> None:
+    """Backfill missing channel names via YouTube oEmbed API."""
+    import json
+    import urllib.request
+    from urllib.error import URLError
+
+    from yt_brain.infrastructure.database import get_videos_missing_channel, update_channel_id
+
+    db_path = _get_db_path()
+    _ensure_db(db_path)
+
+    missing = get_videos_missing_channel(db_path)
+    if not missing:
+        console.print("[green]All videos have channel names.[/green]")
+        return
+
+    console.print(f"[dim]Backfilling channel names for {len(missing)} videos...[/dim]")
+    success = 0
+    for youtube_id, title in missing:
+        try:
+            url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={youtube_id}&format=json"
+            resp = urllib.request.urlopen(url, timeout=10)
+            data = json.loads(resp.read())
+            name = data.get("author_name", "")
+            if name:
+                update_channel_id(db_path, youtube_id, name)
+                success += 1
+        except (URLError, json.JSONDecodeError, TimeoutError):
+            pass
+
+    console.print(f"[green]Backfilled {success}/{len(missing)} channel names.[/green]")
 
 
 @app.command()

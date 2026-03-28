@@ -9,6 +9,9 @@ from yt_brain.infrastructure.ytdlp_adapter import extract_video_id, fetch_metada
 
 
 def ingest_takeout(db_path: Path, takeout_path: Path) -> int:
+    if takeout_path.suffix == ".zip":
+        return _ingest_takeout_zip(db_path, takeout_path)
+
     watch_history_file = _find_watch_history(takeout_path)
     videos = parse_watch_history(watch_history_file)
 
@@ -46,6 +49,38 @@ def ingest_video(db_path: Path, url: str) -> Video:
         save_channel(db_path, video.channel_id, video.title)
 
     return video
+
+
+def _ingest_takeout_zip(db_path: Path, zip_path: Path) -> int:
+    import json
+    import zipfile
+
+    from yt_brain.infrastructure.takeout_parser import _parse_watch_entry
+
+    with zipfile.ZipFile(zip_path) as zf:
+        # Find watch-history.json in the zip
+        watch_file = None
+        for name in zf.namelist():
+            if name.endswith("watch-history.json"):
+                watch_file = name
+                break
+
+        if not watch_file:
+            raise FileNotFoundError(f"No watch-history.json found in {zip_path}")
+
+        with zf.open(watch_file) as f:
+            entries = json.load(f)
+
+    count = 0
+    for entry in entries:
+        video = _parse_watch_entry(entry)
+        if video is not None:
+            save_video(db_path, video)
+            if video.channel_id:
+                save_channel(db_path, video.channel_id, video.channel_id)
+            count += 1
+
+    return count
 
 
 def _find_watch_history(takeout_path: Path) -> Path:

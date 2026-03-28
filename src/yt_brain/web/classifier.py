@@ -112,4 +112,6 @@ def genre_stats(videos: list[dict]) -> list[dict]:
             "count": count,
             "pct": round(count / total * 100, 1) if total else 0,
         })
+    # Keep "Other" at the bottom
+    stats.sort(key=lambda s: (s["genre"] == "Other", -s["count"]))
     return stats

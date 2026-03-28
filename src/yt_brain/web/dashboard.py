@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from pathlib import Path
 
 from flask import Flask, render_template_string
+
+import sqlite3
 
 from yt_brain.infrastructure.config import load_config
 from yt_brain.infrastructure.database import get_all_videos, init_db
@@ -41,12 +42,16 @@ TEMPLATE = """
             grid-template-columns: 1fr 1fr;
             gap: 24px;
             margin-bottom: 32px;
+            align-items: stretch;
         }
         .card {
             background: #1a1a1a;
             border-radius: 12px;
             padding: 24px;
             border: 1px solid #2a2a2a;
+            display: flex;
+            flex-direction: column;
+            max-height: 500px;
         }
         .card h2 {
             font-size: 16px;
@@ -158,18 +163,36 @@ TEMPLATE = """
             font-size: 12px;
             transition: all 0.15s;
         }
-        .filter-btn:hover { border-color: #6366f1; color: #fff; }
-        .filter-btn.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+        input[type="checkbox"] { accent-color: #6366f1; cursor: pointer; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        * { scrollbar-width: thin; scrollbar-color: #333 #1a1a1a; }
     </style>
 </head>
 <body>
     <h1>yt-brain Dashboard</h1>
-    <p class="subtitle">{{ total_videos }} videos analyzed from your YouTube history</p>
+    <p class="subtitle">
+        <span id="filteredCount">{{ total_videos }}</span> videos from your YouTube history &middot; <span id="dateRangeLabel">{{ date_range }}</span>
+        &nbsp;
+        <select id="yearFilter" onchange="applyFilters()" style="background:#222;color:#ccc;border:1px solid #444;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;">
+            <option value="all">All time</option>
+            <option value="1">Last 1 year</option>
+            <option value="2">Last 2 years</option>
+            <option value="3">Last 3 years</option>
+            <option value="5">Last 5 years</option>
+        </select>
+    </p>
 
     <div class="stat-row">
         <div class="stat-box">
             <div class="number">{{ total_videos }}</div>
             <div class="label">Total Videos</div>
+        </div>
+        <div class="stat-box">
+            <div class="number">{{ num_channels }}</div>
+            <div class="label">Channels</div>
         </div>
         <div class="stat-box">
             <div class="number">{{ num_genres }}</div>
@@ -179,27 +202,21 @@ TEMPLATE = """
             <div class="number">{{ top_genre }}</div>
             <div class="label">Top Genre</div>
         </div>
-        <div class="stat-box">
-            <div class="number">{{ total_hours }}h</div>
-            <div class="label">Watch Time</div>
-        </div>
     </div>
 
     <div class="grid">
         <div class="card">
-            <h2>Genre Distribution</h2>
-            <div class="chart-container">
-                <canvas id="genreDonut"></canvas>
-            </div>
-        </div>
-
-        <div class="card">
             <h2>Genre Breakdown</h2>
-            <table>
-                <thead><tr><th>Genre</th><th>Count</th><th></th></tr></thead>
+            <div style="overflow-y:auto;flex:1">
+            <table id="genreTable">
+                <thead><tr>
+                    <th style="width:28px"><input type="checkbox" id="genreSelectAll" checked onchange="toggleAllGenres(this.checked)" title="Select all / none"></th>
+                    <th>Genre</th><th>Count</th><th></th>
+                </tr></thead>
                 <tbody>
                 {% for s in stats %}
                 <tr>
+                    <td><input type="checkbox" class="genre-cb" value="{{ s.genre }}" checked onchange="applyFilters()"></td>
                     <td>{{ s.genre }}</td>
                     <td>{{ s.count }}</td>
                     <td>
@@ -212,46 +229,47 @@ TEMPLATE = """
                 {% endfor %}
                 </tbody>
             </table>
-        </div>
-
-        <div class="card">
-            <h2>Engagement Levels</h2>
-            <div class="engagement-grid">
-                {% for level, count in engagement.items() %}
-                <div class="eng-box eng-{{ level }}">
-                    <div class="num">{{ count }}</div>
-                    <div class="lbl">{{ level }}</div>
-                </div>
-                {% endfor %}
             </div>
         </div>
 
         <div class="card">
-            <h2>Duration Distribution</h2>
-            <div class="chart-container">
-                <canvas id="durationChart"></canvas>
+            <h2>Channel Breakdown</h2>
+            <div style="overflow-y:auto;flex:1">
+            <table id="channelTable">
+                <thead><tr><th>Channel</th><th>Count</th><th></th></tr></thead>
+                <tbody>
+                {% for c in channel_stats %}
+                <tr>
+                    <td><a href="https://www.youtube.com/results?search_query={{ c.name | urlencode }}" target="_blank" style="color:#8b8bf5;text-decoration:none">{{ c.name }}</a></td>
+                    <td>{{ c.count }}</td>
+                    <td>
+                        <div class="bar-cell">
+                            <div class="bar" style="width: {{ c.pct * 2 }}px"></div>
+                            <span class="bar-label">{{ c.pct }}%</span>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
             </div>
         </div>
 
         <div class="card full-width">
             <h2>All Videos</h2>
-            <div class="filter-bar">
-                <button class="filter-btn active" onclick="filterGenre('all')">All</button>
-                {% for s in stats %}
-                <button class="filter-btn" onclick="filterGenre('{{ s.genre }}')">{{ s.genre }} ({{ s.count }})</button>
-                {% endfor %}
+            <div style="display:flex;gap:12px;margin-bottom:12px">
+                <input type="text" id="titleSearch" placeholder="Search titles..." oninput="applyFilters()" style="flex:1;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'">
+                <input type="text" id="channelSearch" placeholder="Search channels..." oninput="applyFilters()" style="flex:1;padding:8px 12px;background:#222;color:#ccc;border:1px solid #333;border-radius:8px;font-size:13px;outline:none;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#333'">
             </div>
             <div class="video-list">
                 <table id="videoTable">
-                    <thead><tr><th>Title</th><th>Channel</th><th>Genre</th><th>Duration</th><th>Engagement</th></tr></thead>
+                    <thead><tr><th>Title</th><th>Channel</th><th>Genre</th></tr></thead>
                     <tbody>
                     {% for v in videos %}
-                    <tr data-genre="{{ v.genre }}">
+                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}">
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" style="color:#8b8bf5;text-decoration:none">{{ v.title[:65] }}</a></td>
-                        <td class="channel">{{ v.channel[:20] }}</td>
+                        <td class="channel"><a href="https://www.youtube.com/results?search_query={{ v.channel | urlencode }}" target="_blank" style="color:#6b7280;text-decoration:none">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
-                        <td class="duration">{{ v.duration_fmt }}</td>
-                        <td>{{ v.engagement }}</td>
                     </tr>
                     {% endfor %}
                     </tbody>
@@ -261,61 +279,132 @@ TEMPLATE = """
     </div>
 
     <script>
-        const genreData = {{ stats_json | safe }};
-        const colors = [
-            '#6366f1','#22c55e','#f59e0b','#ef4444','#ec4899','#8b5cf6',
-            '#06b6d4','#f97316','#14b8a6','#a855f7','#e11d48','#84cc16',
-            '#0ea5e9','#d946ef','#fbbf24','#6b7280'
-        ];
+        function toggleAllGenres(checked) {
+            document.querySelectorAll('.genre-cb').forEach(cb => cb.checked = checked);
+            applyFilters();
+        }
 
-        new Chart(document.getElementById('genreDonut'), {
-            type: 'doughnut',
-            data: {
-                labels: genreData.map(d => d.genre),
-                datasets: [{
-                    data: genreData.map(d => d.count),
-                    backgroundColor: colors.slice(0, genreData.length),
-                    borderWidth: 0,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '55%',
-                plugins: {
-                    legend: { position: 'right', labels: { color: '#ccc', font: { size: 11 }, padding: 12 } }
-                }
+        function getSelectedGenres() {
+            const cbs = document.querySelectorAll('.genre-cb:checked');
+            return new Set(Array.from(cbs).map(cb => cb.value));
+        }
+
+        function applyFilters() {
+            const years = document.getElementById('yearFilter').value;
+            const now = new Date();
+            let cutoff = null;
+            if (years !== 'all') {
+                cutoff = new Date(now);
+                cutoff.setFullYear(cutoff.getFullYear() - parseInt(years));
             }
-        });
 
-        const durData = {{ duration_buckets_json | safe }};
-        new Chart(document.getElementById('durationChart'), {
-            type: 'bar',
-            data: {
-                labels: durData.map(d => d.label),
-                datasets: [{
-                    data: durData.map(d => d.count),
-                    backgroundColor: '#6366f1',
-                    borderRadius: 4,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { ticks: { color: '#888' }, grid: { display: false } },
-                    y: { ticks: { color: '#888' }, grid: { color: '#222' } }
+            const searchTerm = (document.getElementById('titleSearch').value || '').toLowerCase();
+            const selectedGenres = getSelectedGenres();
+            const allCbs = document.querySelectorAll('.genre-cb');
+            const selectAllCb = document.getElementById('genreSelectAll');
+            selectAllCb.checked = selectedGenres.size === allCbs.length;
+            selectAllCb.indeterminate = selectedGenres.size > 0 && selectedGenres.size < allCbs.length;
+
+            const rows = document.querySelectorAll('#videoTable tbody tr');
+            const genreCounts = {};
+            const channelCounts = {};
+            let visibleCount = 0;
+            let minDate = null, maxDate = null;
+
+            rows.forEach(row => {
+                const watched = row.dataset.watched;
+                const genre = row.dataset.genre;
+                const channel = row.children[1]?.textContent || '';
+
+                let dateOk = true;
+                if (cutoff && watched) {
+                    dateOk = new Date(watched) >= cutoff;
+                } else if (cutoff && !watched) {
+                    dateOk = false;
                 }
-            }
-        });
 
-        function filterGenre(genre) {
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            document.querySelectorAll('#videoTable tbody tr').forEach(row => {
-                row.style.display = (genre === 'all' || row.dataset.genre === genre) ? '' : 'none';
+                const genreOk = selectedGenres.has(genre);
+                const title = (row.children[0]?.textContent || '').toLowerCase();
+                const channelTerm = (document.getElementById('channelSearch').value || '').toLowerCase();
+                const searchOk = !searchTerm || title.includes(searchTerm);
+                const channelOk = !channelTerm || channel.toLowerCase().includes(channelTerm);
+                const visible = dateOk && genreOk && searchOk && channelOk;
+                row.style.display = visible ? '' : 'none';
+
+                if (dateOk) {
+                    genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+                    if (genreOk) {
+                        visibleCount++;
+                        if (channel) channelCounts[channel] = (channelCounts[channel] || 0) + 1;
+                        if (watched) {
+                            const d = new Date(watched);
+                            if (!minDate || d < minDate) minDate = d;
+                            if (!maxDate || d > maxDate) maxDate = d;
+                        }
+                    }
+                }
             });
+
+            // Update genre counts and re-sort by count desc, Other last
+            const genreRows = Array.from(document.querySelectorAll('#genreTable tbody tr'));
+            const totalForPct = Object.values(genreCounts).reduce((a,b)=>a+b, 0);
+            genreRows.forEach(tr => {
+                const genre = tr.children[1]?.textContent;
+                const count = genreCounts[genre] || 0;
+                tr.children[2].textContent = count;
+                const pct = totalForPct ? (count/totalForPct*100).toFixed(1) : 0;
+                const barCell = tr.children[3]?.querySelector('.bar-cell');
+                if (barCell) {
+                    barCell.querySelector('.bar').style.width = pct*2+'px';
+                    barCell.querySelector('.bar-label').textContent = pct+'%';
+                }
+            });
+            genreRows.sort((a, b) => {
+                const aGenre = a.children[1]?.textContent;
+                const bGenre = b.children[1]?.textContent;
+                if (aGenre === 'Other') return 1;
+                if (bGenre === 'Other') return -1;
+                return (genreCounts[bGenre] || 0) - (genreCounts[aGenre] || 0);
+            });
+            const genreTbody = document.querySelector('#genreTable tbody');
+            genreRows.forEach(tr => genreTbody.appendChild(tr));
+
+            // Update stats
+            document.getElementById('filteredCount').textContent = visibleCount;
+
+            const statBoxes = document.querySelectorAll('.stat-box .number');
+            statBoxes[0].textContent = visibleCount; // Total Videos
+            statBoxes[1].textContent = Object.keys(channelCounts).length; // Channels
+            statBoxes[2].textContent = Object.keys(genreCounts).length; // Genres
+
+            // Top genre
+            let topGenre = '-';
+            let topCount = 0;
+            for (const [g, c] of Object.entries(genreCounts)) {
+                if (c > topCount) { topCount = c; topGenre = g; }
+            }
+            statBoxes[3].textContent = topGenre;
+
+            // Date range
+            const fmt = d => d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+            const rangeEl = document.getElementById('dateRangeLabel');
+            if (minDate && maxDate) {
+                rangeEl.textContent = minDate.toDateString() === maxDate.toDateString()
+                    ? fmt(minDate) : fmt(minDate) + ' — ' + fmt(maxDate);
+            } else {
+                rangeEl.textContent = '-';
+            }
+
+            // Update channel breakdown table
+            const chBody = document.getElementById('channelTable')?.querySelector('tbody');
+            if (chBody) {
+                const sorted = Object.entries(channelCounts).sort((a,b) => b[1]-a[1]);
+                chBody.innerHTML = sorted.map(([name, count]) => {
+                    const pct = visibleCount ? (count / visibleCount * 100).toFixed(1) : 0;
+                    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
+                    return `<tr><td><a href="${url}" target="_blank" style="color:#8b8bf5;text-decoration:none">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar" style="width:${pct*2}px"></div><span class="bar-label">${pct}%</span></div></td></tr>`;
+                }).join('');
+            }
         }
     </script>
 </body>
@@ -368,12 +457,42 @@ def create_app() -> Flask:
                 "duration": v.duration_seconds,
                 "duration_fmt": dur_fmt,
                 "engagement": v.effective_engagement.value,
+                "watched_at": v.watched_at.isoformat() if v.watched_at else "",
             })
 
         stats = genre_stats(videos)
         total = len(videos)
         total_hours = round(sum(v["duration"] or 0 for v in videos) / 3600, 1)
         top_genre = stats[0]["genre"] if stats else "-"
+
+        # Date range
+        conn = sqlite3.connect(config.db_path)
+        try:
+            row = conn.execute(
+                "SELECT MIN(COALESCE(watched_at, updated_at)), MAX(COALESCE(watched_at, updated_at)) FROM videos"
+            ).fetchone()
+            if row and row[0] and row[1]:
+                from datetime import datetime
+                d_min = datetime.fromisoformat(row[0])
+                d_max = datetime.fromisoformat(row[1])
+                if d_min.date() == d_max.date():
+                    date_range = d_min.strftime("%b %d, %Y")
+                else:
+                    date_range = f"{d_min.strftime('%b %d, %Y')} — {d_max.strftime('%b %d, %Y')}"
+            else:
+                date_range = "-"
+        finally:
+            conn.close()
+
+        # Channel stats
+        channel_counts = Counter(v["channel"] for v in videos if v["channel"])
+        channel_stats = []
+        for name, count in channel_counts.most_common():
+            channel_stats.append({
+                "name": name,
+                "count": count,
+                "pct": round(count / total * 100, 1) if total else 0,
+            })
 
         engagement = {}
         for level in ["UNKNOWN", "BOUNCED", "WATCHED", "LIKED", "CURATED"]:
@@ -406,6 +525,9 @@ def create_app() -> Flask:
             engagement=engagement,
             duration_buckets_json=json.dumps(duration_buckets),
             genre_colors=GENRE_COLORS,
+            channel_stats=channel_stats,
+            num_channels=len(channel_stats),
+            date_range=date_range,
         )
 
     return app

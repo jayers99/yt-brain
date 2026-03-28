@@ -98,13 +98,46 @@ def fetch_history(
     return entries
 
 
+def _fetch_history_range(
+    start: int,
+    end: int,
+    browser: str = "chrome",
+) -> list[dict]:
+    """Fetch a specific range of YouTube watch history entries."""
+    try:
+        result = subprocess.run(
+            [
+                "yt-dlp",
+                "--cookies-from-browser", browser,
+                "--flat-playlist",
+                "--dump-json",
+                "-I", f"{start}:{end}",
+                "https://www.youtube.com/feed/history",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except FileNotFoundError as err:
+        raise IngestError("yt-dlp is not installed. Install with: brew install yt-dlp") from err
+
+    if result.returncode != 0:
+        raise IngestError(f"Failed to fetch history: {result.stderr.strip()}")
+
+    entries = []
+    for line in result.stdout.strip().splitlines():
+        if line.strip():
+            entries.append(json.loads(line))
+    return entries
+
+
 def parse_ytdlp_metadata(metadata: dict) -> Video:
     return Video(
         youtube_id=metadata.get("id", ""),
-        title=metadata.get("title", ""),
-        description=metadata.get("description", ""),
-        channel_id=metadata.get("channel_id", ""),
-        duration_seconds=int(metadata.get("duration", 0)),
+        title=metadata.get("title") or "",
+        description=metadata.get("description") or "",
+        channel_id=metadata.get("channel", "") or metadata.get("uploader", "") or metadata.get("channel_id", ""),
+        duration_seconds=int(metadata.get("duration") or 0),
         tags=metadata.get("tags", []) or [],
         source=Source.MANUAL,
     )
