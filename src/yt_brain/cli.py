@@ -162,27 +162,12 @@ def history(
         console.print(f"\n[dim]Use --save to add these to your brain.[/dim]")
 
 
-YOUTUBE_CATEGORIES = {
-    "1": "Film & Animation", "2": "Autos & Vehicles", "10": "Music",
-    "15": "Pets & Animals", "17": "Sports", "18": "Short Movies",
-    "19": "Travel & Events", "20": "Gaming", "21": "Videoblogging",
-    "22": "People & Blogs", "23": "Comedy", "24": "Entertainment",
-    "25": "News & Politics", "26": "Howto & Style", "27": "Education",
-    "28": "Science & Technology", "29": "Nonprofits & Activism",
-    "30": "Movies", "35": "Documentary", "42": "Shorts", "43": "Shows",
-    "44": "Trailers",
-}
-
-
 @app.command("backfill-categories")
 def backfill_categories() -> None:
     """Backfill missing video categories via YouTube Data API."""
-    import json
-    import urllib.request
-    from urllib.error import URLError
-
+    from yt_brain.application.backfill import backfill_categories as do_backfill
     from yt_brain.infrastructure.config import load_config
-    from yt_brain.infrastructure.database import get_videos_missing_category, update_category
+    from yt_brain.infrastructure.database import get_videos_missing_category
 
     config = load_config()
     if not config.youtube_api_key:
@@ -192,34 +177,14 @@ def backfill_categories() -> None:
     db_path = config.db_path
     _ensure_db(db_path)
 
-    missing = get_videos_missing_category(db_path)
-    if not missing:
+    missing_count = len(get_videos_missing_category(db_path))
+    if not missing_count:
         console.print("[green]All videos have categories.[/green]")
         return
 
-    console.print(f"[dim]Backfilling categories for {len(missing)} videos...[/dim]")
-    filled = 0
-    for i in range(0, len(missing), 50):
-        batch = missing[i:i + 50]
-        ids = ",".join(batch)
-        try:
-            api_url = (
-                f"https://www.googleapis.com/youtube/v3/videos"
-                f"?part=snippet&id={ids}&key={config.youtube_api_key}"
-            )
-            resp = urllib.request.urlopen(api_url, timeout=15)
-            data = json.loads(resp.read())
-            for item in data.get("items", []):
-                cat_id = item["snippet"].get("categoryId", "")
-                cat_name = YOUTUBE_CATEGORIES.get(cat_id, "Other")
-                update_category(db_path, item["id"], cat_name)
-                filled += 1
-        except (URLError, json.JSONDecodeError, KeyError) as e:
-            err_console.print(f"[yellow]Batch error: {e}[/yellow]")
-        if (i + 50) % 500 == 0:
-            console.print(f"[dim]  ...{i + 50}/{len(missing)}[/dim]")
-
-    console.print(f"[green]Backfilled {filled}/{len(missing)} categories.[/green]")
+    console.print(f"[dim]Backfilling categories for {missing_count} videos...[/dim]")
+    filled = do_backfill(db_path, config.youtube_api_key)
+    console.print(f"[green]Backfilled {filled}/{missing_count} categories.[/green]")
 
 
 @app.command()
@@ -506,12 +471,9 @@ def config() -> None:
 @app.command("backfill-dates")
 def backfill_dates() -> None:
     """Backfill missing video dates via YouTube Data API."""
-    import json
-    import urllib.request
-    from urllib.error import URLError
-
+    from yt_brain.application.backfill import backfill_dates as do_backfill
     from yt_brain.infrastructure.config import load_config
-    from yt_brain.infrastructure.database import get_videos_missing_watched_at, update_watched_at
+    from yt_brain.infrastructure.database import get_videos_missing_watched_at
 
     config = load_config()
     if not config.youtube_api_key:
@@ -521,69 +483,33 @@ def backfill_dates() -> None:
     db_path = config.db_path
     _ensure_db(db_path)
 
-    missing = get_videos_missing_watched_at(db_path)
-    if not missing:
+    missing_count = len(get_videos_missing_watched_at(db_path))
+    if not missing_count:
         console.print("[green]All videos have dates.[/green]")
         return
 
-    console.print(f"[dim]Backfilling dates for {len(missing)} videos via YouTube Data API...[/dim]")
-    filled = 0
-    # Process in batches of 50 (API limit)
-    for i in range(0, len(missing), 50):
-        batch = missing[i:i + 50]
-        ids = ",".join(batch)
-        try:
-            api_url = (
-                f"https://www.googleapis.com/youtube/v3/videos"
-                f"?part=snippet&id={ids}&key={config.youtube_api_key}"
-            )
-            resp = urllib.request.urlopen(api_url, timeout=15)
-            data = json.loads(resp.read())
-            for item in data.get("items", []):
-                vid_id = item["id"]
-                published = item["snippet"].get("publishedAt", "")
-                if published:
-                    # Convert ISO 8601 to datetime string
-                    update_watched_at(db_path, vid_id, published)
-                    filled += 1
-        except (URLError, json.JSONDecodeError, KeyError) as e:
-            err_console.print(f"[yellow]Batch error: {e}[/yellow]")
-
-    console.print(f"[green]Backfilled {filled}/{len(missing)} video dates.[/green]")
+    console.print(f"[dim]Backfilling dates for {missing_count} videos via YouTube Data API...[/dim]")
+    filled = do_backfill(db_path, config.youtube_api_key)
+    console.print(f"[green]Backfilled {filled}/{missing_count} video dates.[/green]")
 
 
 @app.command("backfill-channels")
 def backfill_channels() -> None:
     """Backfill missing channel names via YouTube oEmbed API."""
-    import json
-    import urllib.request
-    from urllib.error import URLError
-
-    from yt_brain.infrastructure.database import get_videos_missing_channel, update_channel_id
+    from yt_brain.application.backfill import backfill_channels as do_backfill
+    from yt_brain.infrastructure.database import get_videos_missing_channel
 
     db_path = _get_db_path()
     _ensure_db(db_path)
 
-    missing = get_videos_missing_channel(db_path)
-    if not missing:
+    missing_count = len(get_videos_missing_channel(db_path))
+    if not missing_count:
         console.print("[green]All videos have channel names.[/green]")
         return
 
-    console.print(f"[dim]Backfilling channel names for {len(missing)} videos...[/dim]")
-    success = 0
-    for youtube_id, title in missing:
-        try:
-            url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={youtube_id}&format=json"
-            resp = urllib.request.urlopen(url, timeout=10)
-            data = json.loads(resp.read())
-            name = data.get("author_name", "")
-            if name:
-                update_channel_id(db_path, youtube_id, name)
-                success += 1
-        except (URLError, json.JSONDecodeError, TimeoutError):
-            pass
-
-    console.print(f"[green]Backfilled {success}/{len(missing)} channel names.[/green]")
+    console.print(f"[dim]Backfilling channel names for {missing_count} videos...[/dim]")
+    filled = do_backfill(db_path)
+    console.print(f"[green]Backfilled {filled}/{missing_count} channel names.[/green]")
 
 
 @app.command()
