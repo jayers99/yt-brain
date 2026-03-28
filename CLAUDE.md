@@ -5,7 +5,7 @@ YouTube Knowledge Brain — ingest, classify, and curate YouTube activity into a
 ## Purpose
 
 - Ingest YouTube watch history (Takeout export, yt-dlp history, manual URL)
-- Classify videos by genre (keyword-based) and engagement level
+- Classify videos by genre (YouTube categories via API, keyword fallback) and engagement level
 - Interactive web dashboard for exploring viewing patterns
 - Fetch transcripts on demand via yt-dlp
 - Phase 1 of 4: foundation for semantic clustering, NotebookLM export, and Obsidian integration
@@ -25,6 +25,7 @@ yt-brain dashboard [--port 5555]   # Web dashboard
 yt-brain transcript <video_id>     # Fetch transcript via yt-dlp
 yt-brain backfill-channels         # Fill channel names via oEmbed
 yt-brain backfill-dates            # Fill dates via YouTube Data API
+yt-brain backfill-categories       # Fill YouTube categories via Data API
 yt-brain config                    # Show/set configuration
 ```
 
@@ -47,7 +48,7 @@ Hexagonal architecture:
 | `src/yt_brain/infrastructure/takeout_parser.py` | Google Takeout parser (zip support) |
 | `src/yt_brain/infrastructure/ytdlp_adapter.py` | yt-dlp for history, metadata, transcripts |
 | `src/yt_brain/web/dashboard.py` | Flask web dashboard |
-| `src/yt_brain/web/classifier.py` | Keyword-based genre classifier |
+| `src/yt_brain/web/classifier.py` | Keyword-based genre classifier (fallback) |
 | `tests/features/` | BDD scenarios |
 
 ## Data
@@ -55,3 +56,5 @@ Hexagonal architecture:
 - SQLite DB: `~/.config/yt-brain/yt-brain.db`
 - Config: `~/.config/yt-brain/config.yaml`
 - YouTube API key stored in config (not in repo)
+- Migrations in `migrations/` — auto-applied by `init_db` on startup
+- Starred channels persisted in `starred_channels` table
