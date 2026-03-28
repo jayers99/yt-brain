@@ -1,7 +1,7 @@
 # yt-brain — YouTube Knowledge Brain
 
-**Date**: 2026-03-26
-**Status**: Approved
+**Date**: 2026-03-26 (updated 2026-03-27)
+**Status**: MVP Complete
 **Phase**: 1 of 4 (Ingestion + Engagement Classification)
 
 ## Vision
@@ -27,24 +27,30 @@ yt-brain/
 ├── pyproject.toml              # uv, Python 3.12+
 ├── CLAUDE.md
 ├── src/yt_brain/
-│   ├── cli.py                  # Typer entry point
+│   ├── cli.py                  # Typer entry point (all commands)
 │   ├── domain/
 │   │   ├── models.py           # Video, Channel, Playlist, EngagementLevel
-│   │   ├── classifier.py       # Engagement pyramid logic
-│   │   └── services.py         # Domain services (pure)
+│   │   ├── classifier.py       # Engagement classification logic
+│   │   └── errors.py           # Domain exceptions
 │   ├── application/
-│   │   ├── ingest.py           # Orchestrates ingestion from sources
+│   │   ├── ingest.py           # Orchestrates ingestion (Takeout zip/dir, manual)
 │   │   ├── classify.py         # Runs classification pipeline
-│   │   └── review.py           # Review/curation workflows
-│   └── infrastructure/
-│       ├── youtube_api.py      # YouTube Data API v3 adapter
-│       ├── takeout_parser.py   # Google Takeout JSON/HTML parser
-│       ├── ytdlp_adapter.py    # yt-dlp for transcripts & metadata
-│       ├── database.py         # SQLite repository
-│       └── config.py           # Auth, paths, settings
+│   │   ├── review.py           # Review/curation workflows
+│   │   ├── status.py           # Status dashboard service
+│   │   └── transcript.py       # Transcript fetch service
+│   ├── infrastructure/
+│   │   ├── takeout_parser.py   # Google Takeout JSON parser (zip support)
+│   │   ├── ytdlp_adapter.py    # yt-dlp for history, transcripts & metadata
+│   │   ├── database.py         # SQLite repository
+│   │   └── config.py           # Auth, paths, settings
+│   └── web/
+│       ├── classifier.py       # Keyword-based genre classifier
+│       └── dashboard.py        # Flask web dashboard
 ├── tests/
-│   └── features/               # BDD scenarios
-└── migrations/                 # SQLite schema versioning
+│   ├── features/               # BDD scenarios
+│   └── step_defs/              # Step definitions
+├── migrations/                 # SQLite schema versioning
+└── docs/design/                # Specs and plans
 ```
 
 Follows hexagonal architecture pattern. Infrastructure adapters (API, Takeout, yt-dlp) are swappable.
@@ -87,29 +93,40 @@ Highest signal wins. Thresholds (15%, 85%) are configurable. Users can override 
 ### CLI Commands
 
 ```
-yt-brain ingest takeout <path>     # Import Google Takeout export
-yt-brain ingest api                # Sync via YouTube Data API (likes, playlists, subs)
+yt-brain ingest takeout <path>     # Import Google Takeout export (zip or directory)
 yt-brain ingest video <url>        # Add a single video manually
+yt-brain history [-n 50] [--save]  # Browse/save recent history via yt-dlp
+yt-brain fetch <period>            # Fetch history for a time period (1yr, 2yr, etc.)
 
 yt-brain classify                  # Run engagement classification on unclassified videos
 yt-brain classify --reclassify     # Re-run on everything
 
 yt-brain review                    # Interactive review: videos by engagement tier
 yt-brain review --level curated    # Review specific tier
-yt-brain review --channel <name>   # Review by channel
 
-yt-brain status                    # Dashboard: counts by tier, unclassified, channels
+yt-brain status                    # CLI dashboard: counts by tier
+yt-brain dashboard [--port 5555]   # Web dashboard with interactive filters
 yt-brain transcript <video_id>     # Fetch transcript via yt-dlp
 yt-brain transcript --level liked  # Bulk fetch transcripts for a tier
 
+yt-brain backfill-channels         # Fill missing channel names via oEmbed
+yt-brain backfill-dates            # Fill missing dates via YouTube Data API
 yt-brain config                    # Show/set API keys, thresholds, paths
 ```
 
-**Review UX**: Rich terminal output (via Rich library). Videos displayed in a table grouped by engagement tier showing channel, title, watch %, and current classification. Arrow keys to navigate, enter to select, and a simple prompt to reclassify (e.g., `[b]ounce [w]atched [l]iked [c]urated [s]kip`). Overrides are stored as `engagement_override` on the video record.
+**Review UX**: Rich terminal output (via Rich library). Videos displayed in a table grouped by engagement tier showing channel, title, watch %, and current classification. Simple prompt to reclassify (e.g., `[b]ounce [w]atched [l]iked [c]urated [s]kip`). Overrides are stored as `engagement_override` on the video record.
+
+**Web Dashboard**: Flask-based dark-theme dashboard with:
+- Genre breakdown with checkbox filters (select all/none)
+- Channel breakdown with clickable YouTube links
+- All Videos table with title and channel search
+- Year filter dropdown (1yr, 2yr, 3yr, 5yr, all time)
+- Date range display from actual watch dates
+- All filters combine and recalculate stats dynamically
 
 **Key workflows:**
-1. **Initial backfill**: `yt-brain ingest takeout <path>` → `yt-brain classify` → `yt-brain review`
-2. **Ongoing sync**: `yt-brain ingest api` → `yt-brain classify`
+1. **Initial backfill**: `yt-brain ingest takeout <path>` → `yt-brain backfill-channels` → `yt-brain dashboard`
+2. **Quick history**: `yt-brain history --save -n 200` (auto-backfills channel names)
 3. **Deep dive prep**: `yt-brain transcript --level curated`
 
 ### Data Storage
@@ -143,18 +160,24 @@ transcript_language: en
 
 ### Data Source Strategy
 
-**Primary: YouTube Data API v3** for ongoing sync (likes, playlists, subscriptions).
+**Primary: Google Takeout** for historical data — Takeout provides watch timestamps and channel names. This is the richest data source for building the history.
 
-**Backfill: Google Takeout** for historical data — critically, Takeout includes watch duration which the API does not expose. This is the only source for the bounced/watched classification of historical videos.
+**Metadata enrichment: YouTube Data API v3** for video upload dates (used by `backfill-dates`). Requires an API key (free tier).
 
-**Enrichment: yt-dlp** for transcripts and extended metadata on demand.
+**Channel names: YouTube oEmbed API** for resolving channel names when not available from Takeout (used by `backfill-channels`). No auth required.
+
+**Live history + transcripts: yt-dlp** for browsing recent watch history via browser cookies and fetching transcripts on demand.
+
+**Deferred: YouTube Data API OAuth** for syncing likes, playlists, and subscriptions. Planned for Phase 1.5.
 
 ### Design Decisions
 
 - **SQLite over Postgres/Firestore**: Personal tool, own your data, no server. sqlite-vss upgrade path for Phase 2.
 - **Transcripts on demand, not at ingest**: yt-dlp is slow; only fetch for videos worth keeping.
-- **Engagement tiers drive downstream phases**: Only WATCHED+ gets embedded in Phase 2. BOUNCED is data you can query but won't invest compute in.
-- **Hexagonal architecture**: Matches existing Praxis extensions. Infrastructure adapters (API, Takeout, yt-dlp) are swappable.
+- **Keyword-based genre classification**: Simple regex rules classify videos by title into ~15 genres. Good enough for exploration; ML classification deferred to Phase 2.
+- **Watch percentage not available externally**: YouTube does not expose watch duration through any API. Engagement classification (BOUNCED/WATCHED) requires Takeout data with watch details, which is rare. Current MVP focuses on genre and channel analysis.
+- **Hexagonal architecture**: Infrastructure adapters (API, Takeout, yt-dlp) are swappable.
+- **Client-side dashboard filtering**: All filter logic runs in the browser via JS for instant responsiveness without server round-trips.
 
 ## Future Phases (Vision Only)
 
