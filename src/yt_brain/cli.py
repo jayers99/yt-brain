@@ -162,6 +162,37 @@ def history(
         console.print(f"\n[dim]Use --save to add these to your brain.[/dim]")
 
 
+@app.command()
+def sync(
+    browser: Annotated[str, typer.Option("--browser", "-b", help="Browser to read cookies from")] = "chrome",
+    batch_size: Annotated[int, typer.Option("--batch-size", help="Videos per fetch batch")] = 200,
+) -> None:
+    """Fetch new videos from YouTube history and update the database."""
+    from yt_brain.application.sync import sync_videos
+    from yt_brain.infrastructure.config import load_config
+
+    config = load_config()
+    db_path = config.db_path
+    _ensure_db(db_path)
+
+    console.print(f"[dim]Syncing YouTube history ({browser} cookies)...[/dim]")
+
+    result = sync_videos(
+        db_path=db_path,
+        browser=browser,
+        batch_size=batch_size,
+        api_key=config.youtube_api_key or None,
+    )
+
+    if result.new_videos == 0:
+        console.print("[green]Already up to date.[/green]")
+    else:
+        console.print(f"[green]Synced {result.new_videos} new videos[/green]")
+        console.print(f"  Channels backfilled: {result.channels_backfilled}")
+        console.print(f"  Categories backfilled: {result.categories_backfilled}")
+        console.print(f"  Dates backfilled: {result.dates_backfilled}")
+
+
 @app.command("backfill-categories")
 def backfill_categories() -> None:
     """Backfill missing video categories via YouTube Data API."""
