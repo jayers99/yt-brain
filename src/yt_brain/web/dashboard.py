@@ -144,7 +144,10 @@ TEMPLATE = """
         .eng-WATCHED .num { color: #f59e0b; }
         .eng-LIKED .num { color: #22c55e; }
         .eng-CURATED .num { color: #6366f1; }
-        .video-list { max-height: 500px; overflow-y: auto; }
+        .video-list { max-height: 1000px; overflow-y: auto; }
+        #videoTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
+        #genreTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
+        #channelTable thead th { position: sticky; top: 0; background: #1a1a1a; z-index: 1; }
         .duration { color: #888; font-variant-numeric: tabular-nums; }
         .channel { color: #6b7280; }
         .filter-bar {
