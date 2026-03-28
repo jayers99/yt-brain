@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from pathlib import Path
 
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, jsonify, render_template_string, request, send_from_directory
 
 import sqlite3
 
@@ -58,11 +59,14 @@ TEMPLATE = """
             padding: 32px 40px;
             min-height: 100vh;
         }
+        .top-section {
+            position: relative;
+        }
         h1 {
             font-family: var(--font-display);
-            font-size: 22px;
+            font-size: 24px;
             font-weight: 700;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             color: var(--text-primary);
             letter-spacing: -0.5px;
         }
@@ -71,6 +75,22 @@ TEMPLATE = """
             margin-bottom: 32px;
             font-size: 13px;
             letter-spacing: 0.2px;
+        }
+        .header-logo {
+            position: absolute;
+            top: 35%;
+            right: 10px;
+            transform: translateY(-50%);
+            height: 180px;
+            opacity: 0.8;
+            filter: brightness(0.88) drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+            transition: transform 0.3s ease, filter 0.3s ease;
+            z-index: 2;
+        }
+        .header-logo:hover {
+            opacity: 0.8;
+            transform: translateY(-50%) scale(1.04) rotate(-2deg);
+            filter: brightness(0.9) drop-shadow(0 6px 20px rgba(99, 102, 241, 0.3));
         }
         .grid {
             display: grid;
@@ -108,12 +128,14 @@ TEMPLATE = """
             gap: 20px;
             margin-bottom: 24px;
             padding-bottom: 28px;
+            padding-right: 200px;
             border-bottom: 1px solid var(--border-subtle);
         }
         .stat-box {
+            flex: 1;
             background: var(--bg-surface);
-            border-radius: 12px;
-            padding: 22px 28px;
+            border-radius: 10px;
+            padding: 16px 20px;
             border: 1px solid var(--border-subtle);
             text-align: center;
             box-shadow:
@@ -144,7 +166,7 @@ TEMPLATE = """
         }
         .stat-box .number {
             font-family: var(--font-display);
-            font-size: 32px;
+            font-size: 24px;
             font-weight: 800;
             color: var(--text-primary);
             letter-spacing: -1px;
@@ -332,40 +354,43 @@ TEMPLATE = """
     </style>
 </head>
 <body>
-    <h1>yt-brain Dashboard</h1>
-    <p class="subtitle">
-        <span id="filteredCount">{{ total_videos }}</span> videos from your YouTube history &middot; <span id="dateRangeLabel">{{ date_range }}</span>
-        &nbsp;
-        <select id="yearFilter" onchange="applyFilters()" class="year-filter">
-            <option value="all">All time</option>
-            <option value="1">Last 1 day</option>
-            <option value="7">Last 1 week</option>
-            <option value="30">Last 1 month</option>
-            <option value="182">Last 6 months</option>
-            <option value="365">Last 1 year</option>
-            <option value="730">Last 2 years</option>
-            <option value="1095">Last 3 years</option>
-            <option value="1825">Last 5 years</option>
-        </select>
-    </p>
+    <div class="top-section">
+        <img src="/images/yt-brain-toon-3.png" alt="yt-brain logo" class="header-logo">
+        <h1>yt-brain Dashboard</h1>
+        <p class="subtitle">
+            <span id="filteredCount">{{ total_videos }}</span> videos from your YouTube history &middot; <span id="dateRangeLabel">{{ date_range }}</span>
+            &nbsp;
+            <select id="yearFilter" onchange="applyFilters()" class="year-filter">
+                <option value="all">All time</option>
+                <option value="1">Last 1 day</option>
+                <option value="7">Last 1 week</option>
+                <option value="30">Last 1 month</option>
+                <option value="182">Last 6 months</option>
+                <option value="365">Last 1 year</option>
+                <option value="730">Last 2 years</option>
+                <option value="1095">Last 3 years</option>
+                <option value="1825">Last 5 years</option>
+            </select>
+        </p>
 
     <div class="stat-row">
         <div class="stat-box">
-            <div class="number">{{ total_videos }}</div>
-            <div class="label">Total Videos</div>
-        </div>
-        <div class="stat-box">
-            <div class="number">{{ num_channels }}</div>
-            <div class="label">Channels</div>
+            <div class="number">{{ top_genre }}</div>
+            <div class="label">Top Genre</div>
         </div>
         <div class="stat-box">
             <div class="number">{{ num_genres }}</div>
             <div class="label">Genres</div>
         </div>
         <div class="stat-box">
-            <div class="number">{{ top_genre }}</div>
-            <div class="label">Top Genre</div>
+            <div class="number">{{ num_channels }}</div>
+            <div class="label">Channels</div>
         </div>
+        <div class="stat-box">
+            <div class="number">{{ total_videos }}</div>
+            <div class="label">Total Videos</div>
+        </div>
+    </div>
     </div>
 
     <div class="grid">
@@ -764,6 +789,11 @@ def create_app() -> Flask:
             starred_json=json.dumps(list(starred)),
             channel_urls_json=json.dumps(channel_urls),
         )
+
+    @app.route("/images/<path:filename>")
+    def serve_image(filename: str):
+        images_dir = Path(__file__).parent / "static" / "images"
+        return send_from_directory(images_dir, filename)
 
     @app.route("/api/star", methods=["POST"])
     def api_star():
