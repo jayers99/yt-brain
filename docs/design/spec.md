@@ -179,6 +179,30 @@ transcript_language: en
 - **Hexagonal architecture**: Infrastructure adapters (API, Takeout, yt-dlp) are swappable.
 - **Client-side dashboard filtering**: All filter logic runs in the browser via JS for instant responsiveness without server round-trips.
 
+## Feature Requests
+
+### Auto-Sync: Keep Data Current
+
+**Problem**: The database goes stale as soon as you watch new videos. Currently requires manually re-exporting Takeout or running `history --save` to pick up new watches.
+
+**Desired behavior**: A `yt-brain sync` command that fetches your latest watched videos from YouTube and adds them to the system — including channel names, categories, and dates. Should be idempotent (safe to run repeatedly) and only add videos not already in the database.
+
+**Approach**: Use yt-dlp with browser cookies to pull recent watch history, then enrich new videos via YouTube Data API (categories) and oEmbed (channel names). The sync should:
+- Fetch recent history via `yt-dlp --cookies-from-browser` on the history feed
+- Skip videos already in the database (by youtube_id)
+- Backfill channel names, categories, and dates for new videos only
+- Report what was added (e.g., "Synced 12 new videos since last run")
+
+**Optional**: Could be scheduled via cron/launchd to run daily, or triggered manually. A `--since` flag could limit how far back to look, but the default should be smart enough to stop once it hits videos already in the DB.
+
+**CLI**:
+```
+yt-brain sync                      # Fetch and add new videos since last sync
+yt-brain sync --browser firefox    # Use different browser for cookies
+```
+
+---
+
 ## Future Phases (Vision Only)
 
 ### Phase 2: Embeddings + Semantic Clustering
