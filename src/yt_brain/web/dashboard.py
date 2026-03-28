@@ -365,16 +365,20 @@ TEMPLATE = """
                 const visible = dateOk && genreOk && searchOk && channelOk && starOk;
                 row.style.display = visible ? '' : 'none';
 
-                if (dateOk) {
+                // Genre counts: all filters except genre checkbox
+                const passesNonGenre = dateOk && searchOk && channelOk && starOk;
+                if (passesNonGenre) {
                     genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-                    if (genreOk) {
-                        visibleCount++;
-                        if (channel) channelCounts[channel] = (channelCounts[channel] || 0) + 1;
-                        if (watched) {
-                            const d = new Date(watched);
-                            if (!minDate || d < minDate) minDate = d;
-                            if (!maxDate || d > maxDate) maxDate = d;
-                        }
+                }
+
+                // Channel counts & stats: all filters
+                if (visible) {
+                    visibleCount++;
+                    if (channel) channelCounts[channel] = (channelCounts[channel] || 0) + 1;
+                    if (watched) {
+                        const d = new Date(watched);
+                        if (!minDate || d < minDate) minDate = d;
+                        if (!maxDate || d > maxDate) maxDate = d;
                     }
                 }
             });
