@@ -181,7 +181,7 @@ transcript_language: en
 
 ## Feature Requests
 
-### Auto-Sync: Keep Data Current
+### Auto-Sync: Keep Data Current (Implemented)
 
 **Problem**: The database goes stale as soon as you watch new videos. Currently requires manually re-exporting Takeout or running `history --save` to pick up new watches.
 

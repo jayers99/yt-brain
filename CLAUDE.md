@@ -18,6 +18,7 @@ yt-brain ingest takeout <path>     # Import Google Takeout export (zip or dir)
 yt-brain ingest video <url>        # Add a single video manually
 yt-brain history [-n 50] [--save]  # Browse/save recent history via yt-dlp
 yt-brain fetch <period>            # Fetch history for time period (1yr, 2yr)
+yt-brain sync                      # Fetch and add new videos since last sync
 yt-brain classify                  # Run engagement classification
 yt-brain review                    # Interactive review by tier
 yt-brain status                    # CLI dashboard counts
