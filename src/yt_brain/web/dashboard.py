@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 from collections import Counter
 
-from flask import Flask, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 
 import sqlite3
 
 from yt_brain.infrastructure.config import load_config
-from yt_brain.infrastructure.database import get_all_videos, init_db
+from yt_brain.infrastructure.database import get_all_videos, get_channel_urls, get_starred_channels, init_db, toggle_starred_channel
 
 from .classifier import classify_genre, genre_stats
 
@@ -164,6 +164,9 @@ TEMPLATE = """
             transition: all 0.15s;
         }
         input[type="checkbox"] { accent-color: #6366f1; cursor: pointer; }
+        .star-btn { cursor: pointer; font-size: 16px; color: #444; transition: color 0.15s; }
+        .star-btn:hover { color: #f59e0b; }
+        .star-btn.starred { color: #f59e0b; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #1a1a1a; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
@@ -236,11 +239,12 @@ TEMPLATE = """
             <h2>Channel Breakdown</h2>
             <div style="overflow-y:auto;flex:1">
             <table id="channelTable">
-                <thead><tr><th>Channel</th><th>Count</th><th></th></tr></thead>
+                <thead><tr><th style="width:28px"><span id="starFilter" class="star-btn" onclick="toggleStarFilter()" title="Show starred only">&#9733;</span></th><th>Channel</th><th>Count</th><th></th></tr></thead>
                 <tbody>
                 {% for c in channel_stats %}
                 <tr>
-                    <td><a href="https://www.youtube.com/results?search_query={{ c.name | urlencode }}" target="_blank" style="color:#8b8bf5;text-decoration:none">{{ c.name }}</a></td>
+                    <td><span class="star-btn{% if c.starred %} starred{% endif %}" onclick="toggleStar(this, '{{ c.name | e }}')" title="Star channel">&#9733;</span></td>
+                    <td><a href="{{ c.url or 'https://www.youtube.com/results?search_query=' + c.name|urlencode }}" target="_blank" style="color:#8b8bf5;text-decoration:none">{{ c.name }}</a></td>
                     <td>{{ c.count }}</td>
                     <td>
                         <div class="bar-cell">
@@ -268,7 +272,7 @@ TEMPLATE = """
                     {% for v in videos %}
                     <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}">
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" style="color:#8b8bf5;text-decoration:none">{{ v.title[:65] }}</a></td>
-                        <td class="channel"><a href="https://www.youtube.com/results?search_query={{ v.channel | urlencode }}" target="_blank" style="color:#6b7280;text-decoration:none">{{ v.channel[:20] }}</a></td>
+                        <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" style="color:#6b7280;text-decoration:none">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
                     </tr>
                     {% endfor %}
@@ -279,6 +283,29 @@ TEMPLATE = """
     </div>
 
     <script>
+        const starredChannels = new Set({{ starred_json | safe }});
+        const channelUrls = {{ channel_urls_json | safe }};
+
+        let starFilterActive = false;
+
+        function toggleStarFilter() {
+            starFilterActive = !starFilterActive;
+            document.getElementById('starFilter').classList.toggle('starred', starFilterActive);
+            applyFilters();
+        }
+
+        function toggleStar(el, channelName) {
+            fetch('/api/star', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({channel: channelName})
+            }).then(r => r.json()).then(data => {
+                el.classList.toggle('starred', data.starred);
+                if (data.starred) starredChannels.add(channelName);
+                else starredChannels.delete(channelName);
+            });
+        }
+
         function toggleAllGenres(checked) {
             document.querySelectorAll('.genre-cb').forEach(cb => cb.checked = checked);
             applyFilters();
@@ -328,7 +355,8 @@ TEMPLATE = """
                 const channelTerm = (document.getElementById('channelSearch').value || '').toLowerCase();
                 const searchOk = !searchTerm || title.includes(searchTerm);
                 const channelOk = !channelTerm || channel.toLowerCase().includes(channelTerm);
-                const visible = dateOk && genreOk && searchOk && channelOk;
+                const starOk = !starFilterActive || starredChannels.has(channel);
+                const visible = dateOk && genreOk && searchOk && channelOk && starOk;
                 row.style.display = visible ? '' : 'none';
 
                 if (dateOk) {
@@ -398,11 +426,16 @@ TEMPLATE = """
             // Update channel breakdown table
             const chBody = document.getElementById('channelTable')?.querySelector('tbody');
             if (chBody) {
-                const sorted = Object.entries(channelCounts).sort((a,b) => b[1]-a[1]);
+                const filtered = starFilterActive
+                    ? Object.entries(channelCounts).filter(([name]) => starredChannels.has(name))
+                    : Object.entries(channelCounts);
+                const sorted = filtered.sort((a,b) => b[1]-a[1]);
                 chBody.innerHTML = sorted.map(([name, count]) => {
                     const pct = visibleCount ? (count / visibleCount * 100).toFixed(1) : 0;
-                    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
-                    return `<tr><td><a href="${url}" target="_blank" style="color:#8b8bf5;text-decoration:none">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar" style="width:${pct*2}px"></div><span class="bar-label">${pct}%</span></div></td></tr>`;
+                    const url = channelUrls[name] || `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
+                    const starred = starredChannels.has(name) ? ' starred' : '';
+                    const eName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">&#9733;</span></td><td><a href="${url}" target="_blank" style="color:#8b8bf5;text-decoration:none">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar" style="width:${pct*2}px"></div><span class="bar-label">${pct}%</span></div></td></tr>`;
                 }).join('');
             }
         }
@@ -439,6 +472,7 @@ def create_app() -> Flask:
         config = load_config()
         init_db(config.db_path)
         videos_raw = get_all_videos(config.db_path)
+        channel_urls = get_channel_urls(config.db_path)
 
         videos = []
         for v in videos_raw:
@@ -453,11 +487,12 @@ def create_app() -> Flask:
                 "id": v.youtube_id,
                 "title": v.title,
                 "channel": v.channel_id,
-                "genre": classify_genre(v.title),
+                "genre": v.category or classify_genre(v.title),
                 "duration": v.duration_seconds,
                 "duration_fmt": dur_fmt,
                 "engagement": v.effective_engagement.value,
                 "watched_at": v.watched_at.isoformat() if v.watched_at else "",
+                "channel_url": channel_urls.get(v.channel_id, ""),
             })
 
         stats = genre_stats(videos)
@@ -485,6 +520,7 @@ def create_app() -> Flask:
             conn.close()
 
         # Channel stats
+        starred = get_starred_channels(config.db_path)
         channel_counts = Counter(v["channel"] for v in videos if v["channel"])
         channel_stats = []
         for name, count in channel_counts.most_common():
@@ -492,6 +528,8 @@ def create_app() -> Flask:
                 "name": name,
                 "count": count,
                 "pct": round(count / total * 100, 1) if total else 0,
+                "starred": name in starred,
+                "url": channel_urls.get(name, ""),
             })
 
         engagement = {}
@@ -528,7 +566,20 @@ def create_app() -> Flask:
             channel_stats=channel_stats,
             num_channels=len(channel_stats),
             date_range=date_range,
+            starred_json=json.dumps(list(starred)),
+            channel_urls_json=json.dumps(channel_urls),
         )
+
+    @app.route("/api/star", methods=["POST"])
+    def api_star():
+        config = load_config()
+        init_db(config.db_path)
+        data = request.get_json()
+        channel_name = data.get("channel", "")
+        if not channel_name:
+            return jsonify({"error": "missing channel"}), 400
+        is_starred = toggle_starred_channel(config.db_path, channel_name)
+        return jsonify({"starred": is_starred, "channel": channel_name})
 
     return app
 

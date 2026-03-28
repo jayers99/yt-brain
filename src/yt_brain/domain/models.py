@@ -42,6 +42,7 @@ class Video(BaseModel):
     transcript: str | None = None
     tags: list[str] = Field(default_factory=list)
     source: Source = Source.MANUAL
+    category: str = ""
 
     @property
     def effective_engagement(self) -> EngagementLevel:

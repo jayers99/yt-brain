@@ -13,16 +13,24 @@ def init_db(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
-        migration_file = Path(__file__).parent.parent.parent.parent / "migrations" / "001_initial_schema.sql"
-        if not migration_file.exists():
-            raise DatabaseError(f"Migration file not found: {migration_file}")
+        migrations_dir = Path(__file__).parent.parent.parent.parent / "migrations"
 
+        # Check if schema_version exists
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
-        if cursor.fetchone() is not None:
-            return
+        if cursor.fetchone() is None:
+            # Fresh DB — run initial migration
+            sql = (migrations_dir / "001_initial_schema.sql").read_text()
+            conn.executescript(sql)
 
-        sql = migration_file.read_text()
-        conn.executescript(sql)
+        # Run any pending migrations
+        cursor = conn.execute("SELECT MAX(version) FROM schema_version")
+        current_version = cursor.fetchone()[0] or 0
+
+        for mig_file in sorted(migrations_dir.glob("*.sql")):
+            # Extract version number from filename (e.g., 002_starred_channels.sql -> 2)
+            version = int(mig_file.name.split("_")[0])
+            if version > current_version:
+                conn.executescript(mig_file.read_text())
     finally:
         conn.close()
 
@@ -185,6 +193,60 @@ def update_watched_at(db_path: Path, youtube_id: str, watched_at: str) -> None:
         conn.close()
 
 
+def get_videos_missing_category(db_path: Path) -> list[str]:
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("SELECT youtube_id FROM videos WHERE category = ''")
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def update_category(db_path: Path, youtube_id: str, category: str) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("UPDATE videos SET category = ? WHERE youtube_id = ?", (category, youtube_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_channel_urls(db_path: Path) -> dict[str, str]:
+    """Return {channel_name: youtube_url} for channels with URLs."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("SELECT youtube_id, url FROM channels WHERE url != ''")
+        return {row[0]: row[1] for row in cursor.fetchall()}
+    finally:
+        conn.close()
+
+
+def get_starred_channels(db_path: Path) -> set[str]:
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("SELECT channel_name FROM starred_channels")
+        return {row[0] for row in cursor.fetchall()}
+    finally:
+        conn.close()
+
+
+def toggle_starred_channel(db_path: Path, channel_name: str) -> bool:
+    """Toggle star status. Returns True if now starred, False if unstarred."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("SELECT 1 FROM starred_channels WHERE channel_name = ?", (channel_name,))
+        if cursor.fetchone():
+            conn.execute("DELETE FROM starred_channels WHERE channel_name = ?", (channel_name,))
+            conn.commit()
+            return False
+        else:
+            conn.execute("INSERT INTO starred_channels (channel_name) VALUES (?)", (channel_name,))
+            conn.commit()
+            return True
+    finally:
+        conn.close()
+
+
 def is_video_in_playlist(db_path: Path, youtube_id: str) -> bool:
     conn = sqlite3.connect(db_path)
     try:
@@ -221,4 +283,5 @@ def _row_to_video(row: sqlite3.Row) -> Video:
         transcript=row["transcript"],
         tags=json.loads(row["tags"]),
         source=Source(row["source"]),
+        category=row["category"] if "category" in row.keys() else "",
     )

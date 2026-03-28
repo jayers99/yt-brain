@@ -77,7 +77,12 @@ def _ingest_takeout_zip(db_path: Path, zip_path: Path) -> int:
         if video is not None:
             save_video(db_path, video)
             if video.channel_id:
-                save_channel(db_path, video.channel_id, video.channel_id)
+                # Extract channel URL from raw entry
+                channel_url = ""
+                subtitles = entry.get("subtitles", [])
+                if subtitles:
+                    channel_url = subtitles[0].get("url", "")
+                save_channel(db_path, video.channel_id, video.channel_id, channel_url)
             count += 1
 
     return count

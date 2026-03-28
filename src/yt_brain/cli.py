@@ -162,6 +162,66 @@ def history(
         console.print(f"\n[dim]Use --save to add these to your brain.[/dim]")
 
 
+YOUTUBE_CATEGORIES = {
+    "1": "Film & Animation", "2": "Autos & Vehicles", "10": "Music",
+    "15": "Pets & Animals", "17": "Sports", "18": "Short Movies",
+    "19": "Travel & Events", "20": "Gaming", "21": "Videoblogging",
+    "22": "People & Blogs", "23": "Comedy", "24": "Entertainment",
+    "25": "News & Politics", "26": "Howto & Style", "27": "Education",
+    "28": "Science & Technology", "29": "Nonprofits & Activism",
+    "30": "Movies", "35": "Documentary", "42": "Shorts", "43": "Shows",
+    "44": "Trailers",
+}
+
+
+@app.command("backfill-categories")
+def backfill_categories() -> None:
+    """Backfill missing video categories via YouTube Data API."""
+    import json
+    import urllib.request
+    from urllib.error import URLError
+
+    from yt_brain.infrastructure.config import load_config
+    from yt_brain.infrastructure.database import get_videos_missing_category, update_category
+
+    config = load_config()
+    if not config.youtube_api_key:
+        err_console.print("[red]No YouTube API key configured.[/red]")
+        raise typer.Exit(1)
+
+    db_path = config.db_path
+    _ensure_db(db_path)
+
+    missing = get_videos_missing_category(db_path)
+    if not missing:
+        console.print("[green]All videos have categories.[/green]")
+        return
+
+    console.print(f"[dim]Backfilling categories for {len(missing)} videos...[/dim]")
+    filled = 0
+    for i in range(0, len(missing), 50):
+        batch = missing[i:i + 50]
+        ids = ",".join(batch)
+        try:
+            api_url = (
+                f"https://www.googleapis.com/youtube/v3/videos"
+                f"?part=snippet&id={ids}&key={config.youtube_api_key}"
+            )
+            resp = urllib.request.urlopen(api_url, timeout=15)
+            data = json.loads(resp.read())
+            for item in data.get("items", []):
+                cat_id = item["snippet"].get("categoryId", "")
+                cat_name = YOUTUBE_CATEGORIES.get(cat_id, "Other")
+                update_category(db_path, item["id"], cat_name)
+                filled += 1
+        except (URLError, json.JSONDecodeError, KeyError) as e:
+            err_console.print(f"[yellow]Batch error: {e}[/yellow]")
+        if (i + 50) % 500 == 0:
+            console.print(f"[dim]  ...{i + 50}/{len(missing)}[/dim]")
+
+    console.print(f"[green]Backfilled {filled}/{len(missing)} categories.[/green]")
+
+
 @app.command()
 def fetch(
     period: Annotated[str, typer.Argument(help="How far back to fetch, e.g. 1yr, 2yr, 3yr")],
