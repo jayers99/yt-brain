@@ -4,6 +4,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from yt_brain.domain.models import EngagementLevel, Source, Video
 from yt_brain.infrastructure.database import (
+    get_existing_video_ids,
     get_video,
     get_videos_by_engagement,
     init_db,
@@ -85,3 +86,18 @@ def check_schema_version(db_path, version: int) -> None:
 @then(parsers.parse("I get {count:d} videos"))
 def check_video_count(video_list, count: int) -> None:
     assert len(video_list) == count
+
+
+def test_get_existing_video_ids(temp_db):
+    v1 = Video(youtube_id="aaa", title="Video A", channel_id="ch1")
+    v2 = Video(youtube_id="bbb", title="Video B", channel_id="ch2")
+    save_video(temp_db, v1)
+    save_video(temp_db, v2)
+
+    result = get_existing_video_ids(temp_db, ["aaa", "bbb", "ccc", "ddd"])
+    assert result == {"aaa", "bbb"}
+
+
+def test_get_existing_video_ids_empty(temp_db):
+    result = get_existing_video_ids(temp_db, [])
+    assert result == set()
