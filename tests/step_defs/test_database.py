@@ -1,0 +1,87 @@
+import sqlite3
+
+from pytest_bdd import given, parsers, scenarios, then, when
+
+from yt_brain.domain.models import EngagementLevel, Source, Video
+from yt_brain.infrastructure.database import (
+    get_video,
+    get_videos_by_engagement,
+    init_db,
+    save_video,
+)
+
+scenarios("../features/database.feature")
+
+
+@given("a fresh database", target_fixture="db_path")
+def fresh_database(temp_config_dir):
+    db_path = temp_config_dir / "yt-brain.db"
+    init_db(db_path)
+    return db_path
+
+
+@given(parsers.parse('a video "{vid}" titled "{title}" from channel "{channel}"'), target_fixture="video")
+def create_video(vid: str, title: str, channel: str) -> Video:
+    return Video(youtube_id=vid, title=title, channel_id=channel, source=Source.MANUAL)
+
+
+@given(parsers.parse('a saved video "{vid}" with engagement "{level}"'))
+def save_video_with_engagement(db_path, vid: str, level: str) -> None:
+    video = Video(
+        youtube_id=vid,
+        title=f"Video {vid}",
+        channel_id="ch1",
+        engagement_level=EngagementLevel(level),
+        source=Source.MANUAL,
+    )
+    save_video(db_path, video)
+
+
+@when("I save the video")
+def do_save(db_path, video) -> None:
+    save_video(db_path, video)
+
+
+@when(parsers.parse('I save a video "{vid}" titled "{title}" from channel "{channel}"'))
+def save_another(db_path, vid: str, title: str, channel: str) -> None:
+    video = Video(youtube_id=vid, title=title, channel_id=channel, source=Source.MANUAL)
+    save_video(db_path, video)
+
+
+@when(parsers.parse('I retrieve video "{vid}"'), target_fixture="retrieved")
+def do_retrieve(db_path, vid: str):
+    return get_video(db_path, vid)
+
+
+@when(parsers.parse('I list videos with engagement "{level}"'), target_fixture="video_list")
+def do_list_by_engagement(db_path, level: str):
+    return get_videos_by_engagement(db_path, EngagementLevel(level))
+
+
+@then(parsers.parse('the retrieved video title is "{title}"'))
+def check_title(retrieved, title: str) -> None:
+    assert retrieved is not None
+    assert retrieved.title == title
+
+
+@then(parsers.parse("the {table} table exists"))
+def check_table_exists(db_path, table: str) -> None:
+    conn = sqlite3.connect(db_path)
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+    assert cursor.fetchone() is not None
+    conn.close()
+
+
+@then(parsers.parse("the schema_version is {version:d}"))
+def check_schema_version(db_path, version: int) -> None:
+    conn = sqlite3.connect(db_path)
+    cursor = conn.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
+    row = cursor.fetchone()
+    conn.close()
+    assert row is not None
+    assert row[0] == version
+
+
+@then(parsers.parse("I get {count:d} videos"))
+def check_video_count(video_list, count: int) -> None:
+    assert len(video_list) == count
