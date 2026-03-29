@@ -253,6 +253,7 @@ TEMPLATE = """
             height: 6px;
             border-radius: 3px;
             background: var(--bg-hover);
+            overflow: hidden;
         }
         .bar {
             height: 100%;
@@ -263,6 +264,7 @@ TEMPLATE = """
         }
         .bar-label {
             flex-shrink: 0;
+            min-width: 38px;
             font-family: var(--font-display);
             font-size: 11px;
             color: var(--text-muted);
