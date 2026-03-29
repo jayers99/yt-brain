@@ -108,42 +108,73 @@ def _generate_slug(
     return f"{slug}-{i}"
 
 
+def _strip_code_fences(text: str) -> str:
+    """Strip markdown code fences from a response."""
+    text = text.strip()
+    if text.startswith("```"):
+        # Remove opening fence (possibly with language tag)
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+    if text.endswith("```"):
+        text = text.rsplit("```", 1)[0]
+    return text.strip()
+
+
 def _generate_parent_categories(slugs: list[str], api_key: str) -> dict[str, str]:
     """Ask Claude to group cluster slugs into ~12-15 parent categories.
 
-    Returns {slug: parent_category_name}.
+    Batches slugs to avoid output truncation. Returns {slug: parent_category_name}.
     """
     import anthropic
     import json
 
     client = anthropic.Anthropic(api_key=api_key)
-    slugs_text = "\n".join(f"- {s}" for s in slugs)
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=4096,
-        system=(
-            "You are a categorization assistant. You receive a list of topic cluster slugs "
-            "and must group them into 10-15 broad parent categories. "
-            "Respond with ONLY valid JSON: an object where keys are slug strings and values "
-            "are short parent category names (2-3 words, Title Case). "
-            "Example: {\"film-photography\": \"Photography\", \"sony-lens-reviews\": \"Photography\", "
-            "\"claude-code-workflows\": \"Tech & Dev\"}"
-        ),
-        messages=[{
-            "role": "user",
-            "content": f"Group these cluster slugs into 10-15 parent categories:\n\n{slugs_text}",
-        }],
-    )
-    text = message.content[0].text.strip()
+    slug_set = set(slugs)
+    result: dict[str, str] = {}
 
-    try:
-        result = json.loads(text)
-        if isinstance(result, dict):
-            return {k: v for k, v in result.items() if k in slugs}
-    except json.JSONDecodeError:
-        pass
+    # Process in batches of 40 to avoid output truncation
+    batch_size = 40
+    for i in range(0, len(slugs), batch_size):
+        batch = slugs[i : i + batch_size]
+        slugs_text = "\n".join(f"- {s}" for s in batch)
 
-    return {s: "Other" for s in slugs}
+        # Include existing categories so the model reuses them
+        existing_cats = sorted(set(result.values())) if result else []
+        cat_hint = ""
+        if existing_cats:
+            cat_hint = f"\n\nReuse these existing categories where appropriate: {', '.join(existing_cats)}"
+
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            system=(
+                "You are a categorization assistant. You receive a list of topic cluster slugs "
+                "and must group them into broad parent categories (10-15 total across all batches). "
+                "Respond with ONLY valid JSON (no markdown fences): an object where keys are "
+                "slug strings and values are short parent category names (2-3 words, Title Case). "
+                "Example: {\"film-photography\": \"Photography\", \"claude-code-workflows\": \"Tech & Dev\"}"
+            ),
+            messages=[{
+                "role": "user",
+                "content": f"Categorize these cluster slugs:{cat_hint}\n\n{slugs_text}",
+            }],
+        )
+        text = _strip_code_fences(message.content[0].text)
+
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                for k, v in parsed.items():
+                    if k in slug_set:
+                        result[k] = v
+        except json.JSONDecodeError:
+            pass
+
+    # Fill in any missed slugs
+    for s in slugs:
+        if s not in result:
+            result[s] = "Other"
+
+    return result
 
 
 def cluster_videos(
