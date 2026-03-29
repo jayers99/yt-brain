@@ -69,3 +69,21 @@ def test_video_with_no_cluster_returns_none(temp_db: Path) -> None:
     save_video(temp_db, _make_video("vid1"))
     slug = get_video_cluster_slug(temp_db, "vid1")
     assert slug is None
+
+
+from typer.testing import CliRunner
+from yt_brain.cli import app as cli_app
+
+runner = CliRunner()
+
+
+def test_cluster_list_empty(temp_db: Path) -> None:
+    result = runner.invoke(cli_app, ["cluster", "list"])
+    assert result.exit_code == 0
+    assert "No clusters" in result.stdout
+
+
+def test_cluster_rename_not_found(temp_db: Path) -> None:
+    result = runner.invoke(cli_app, ["cluster", "rename", "nonexistent", "new-name"])
+    assert result.exit_code == 0
+    assert "not found" in result.stdout.lower()
