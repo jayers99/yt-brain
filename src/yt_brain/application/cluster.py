@@ -63,16 +63,25 @@ def _call_claude_for_label(titles: list[str], api_key: str) -> str:
     titles_text = "\n".join(f"- {t}" for t in titles[:10])
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=30,
+        max_tokens=15,
+        system=(
+            "You are a labeling assistant. You receive a list of video titles that belong "
+            "to the same topic cluster. Respond with ONLY a 2-4 word topic label. "
+            "No punctuation. No explanation. No caveats. Examples: 'Police Body Cam', "
+            "'Agentic Software Development', 'Coffee Brewing Techniques'."
+        ),
         messages=[{
             "role": "user",
-            "content": (
-                f"These video titles belong to the same topic cluster:\n\n{titles_text}\n\n"
-                "Reply with ONLY a short label (2-4 words) describing the topic. No punctuation, no explanation."
-            ),
+            "content": titles_text,
         }],
     )
-    return message.content[0].text.strip()
+    label = message.content[0].text.strip()
+
+    # Validate: reject if too long (refusal/explanation) or empty
+    if len(label.split()) > 6 or len(label) > 60 or not label:
+        raise ValueError(f"Bad label response: {label[:80]}")
+
+    return label
 
 
 def _generate_slug(
