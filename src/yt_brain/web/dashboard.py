@@ -324,6 +324,81 @@ TEMPLATE = """
             transition: color 0.15s ease;
         }
         .link-cluster:hover { color: var(--accent); }
+        /* Topic Grid */
+        .topic-breadcrumb {
+            font-size: 13px;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+        .topic-breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .topic-breadcrumb a:hover { text-decoration: underline; }
+        .topic-breadcrumb span::before { content: ' \203A '; color: var(--text-tertiary); }
+        .topic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        .topic-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            padding: 14px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .topic-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+        .topic-card-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .topic-card-meta {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-bottom: 6px;
+        }
+        .topic-card-preview {
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .topic-expanded-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .topic-expanded-list a {
+            display: inline-block;
+            padding: 6px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 16px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .topic-expanded-list a:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .topic-show-all {
+            display: inline-block;
+            font-size: 12px;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .topic-show-all:hover { text-decoration: underline; }
         .filter-bar {
             display: flex;
             gap: 8px;
@@ -497,6 +572,30 @@ TEMPLATE = """
             </div>
         </div>
 
+        {% if topic_grid %}
+        <div class="card card-primary full-width" id="topicGridCard">
+            <div id="topicBreadcrumb" class="topic-breadcrumb" style="display:none">
+                <a href="#" onclick="topicGridReset(); return false;">All</a>
+                <span id="breadcrumbParent"></span>
+                <span id="breadcrumbChild"></span>
+            </div>
+            <h2 id="topicGridTitle">Browse by Topic</h2>
+            <div id="topicGrid" class="topic-grid">
+                {% for cat, data in topic_grid %}
+                <div class="topic-card" onclick="expandCategory('{{ cat }}')" data-category="{{ cat }}">
+                    <div class="topic-card-name">{{ cat }}</div>
+                    <div class="topic-card-meta">{{ data.total }} videos &middot; {{ data.clusters|length }} clusters</div>
+                    <div class="topic-card-preview">{{ data.clusters[:3]|map(attribute='slug')|join(', ') }}{% if data.clusters|length > 3 %}, ...{% endif %}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="topicExpanded" class="topic-expanded" style="display:none">
+                <div id="topicExpandedList" class="topic-expanded-list"></div>
+                <a href="#" id="topicShowAll" class="topic-show-all" onclick="return false;">Show all videos</a>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card card-primary full-width">
             <h2>All Videos</h2>
             <div class="video-list">
@@ -570,13 +669,92 @@ TEMPLATE = """
         let semanticMatchIds = null;  // null = no search active, Set = matched IDs
         let semanticTimer = null;
         let activeClusterFilter = null;
+        let activeParentFilter = null;
+
+        // Topic Grid data and navigation
+        const topicGridData = {{ topic_grid_json | safe }};
+
+        function topicGridReset() {
+            document.getElementById('topicGrid').style.display = 'grid';
+            document.getElementById('topicExpanded').style.display = 'none';
+            document.getElementById('topicBreadcrumb').style.display = 'none';
+            document.getElementById('topicGridTitle').textContent = 'Browse by Topic';
+            activeClusterFilter = null;
+            activeParentFilter = null;
+            semanticSearchEl.value = '';
+            semanticMatchIds = null;
+            applyFilters();
+        }
+
+        function expandCategory(cat) {
+            const data = topicGridData[cat];
+            if (!data) return;
+
+            document.getElementById('topicGrid').style.display = 'none';
+            document.getElementById('topicExpanded').style.display = 'block';
+            document.getElementById('topicBreadcrumb').style.display = 'block';
+            document.getElementById('topicGridTitle').textContent = cat;
+            document.getElementById('breadcrumbParent').innerHTML =
+                '<a href="#" onclick="showParentVideos(\'' + cat.replace(/'/g, "\\'") + '\'); return false;">' + cat + '</a>';
+            document.getElementById('breadcrumbChild').innerHTML = '';
+
+            const list = document.getElementById('topicExpandedList');
+            list.innerHTML = data.clusters.map(c =>
+                '<a href="#" onclick="selectChildCluster(\'' + cat.replace(/'/g, "\\'") + '\', \'' + c.slug + '\'); return false;">' +
+                c.slug + ' <span style="color:var(--text-tertiary)">(' + c.count + ')</span></a>'
+            ).join('');
+
+            const showAll = document.getElementById('topicShowAll');
+            showAll.textContent = 'Show all ' + data.total + ' ' + cat + ' videos';
+            showAll.onclick = function() { showParentVideos(cat); return false; };
+
+            // Don't filter yet - just show the expanded view
+            activeClusterFilter = null;
+            activeParentFilter = null;
+            semanticSearchEl.value = '';
+            semanticMatchIds = null;
+            applyFilters();
+        }
+
+        function showParentVideos(cat) {
+            const data = topicGridData[cat];
+            if (!data) return;
+
+            document.getElementById('topicBreadcrumb').style.display = 'block';
+            document.getElementById('breadcrumbParent').innerHTML =
+                '<a href="#" onclick="expandCategory(\'' + cat.replace(/'/g, "\\'") + '\'); return false;">' + cat + '</a>';
+            document.getElementById('breadcrumbChild').innerHTML = '';
+
+            // Filter to all clusters in this category
+            const slugs = new Set(data.clusters.map(c => c.slug));
+            activeParentFilter = slugs;
+            activeClusterFilter = null;
+            semanticSearchEl.value = 'category:' + cat;
+            semanticMatchIds = null;
+            applyFilters();
+        }
+
+        function selectChildCluster(cat, slug) {
+            document.getElementById('topicBreadcrumb').style.display = 'block';
+            document.getElementById('breadcrumbParent').innerHTML =
+                '<a href="#" onclick="expandCategory(\'' + cat.replace(/'/g, "\\'") + '\'); return false;">' + cat + '</a>';
+            document.getElementById('breadcrumbChild').innerHTML =
+                '<span style="color:var(--text-primary)">' + slug + '</span>';
+
+            activeClusterFilter = slug;
+            activeParentFilter = null;
+            semanticSearchEl.value = 'cluster:' + slug;
+            semanticMatchIds = null;
+            applyFilters();
+        }
 
         function clearSearch() {
             semanticSearchEl.value = '';
             semanticSearchEl.focus();
             semanticMatchIds = null;
             activeClusterFilter = null;
-            applyFilters();
+            activeParentFilter = null;
+            topicGridReset();
         }
 
         function filterByCluster(slug) {
@@ -592,18 +770,25 @@ TEMPLATE = """
             if (!q) {
                 semanticMatchIds = null;
                 activeClusterFilter = null;
+                activeParentFilter = null;
                 applyFilters();
                 return;
+            }
+            // Check for category: filter (from parent click)
+            if (q.startsWith('category:')) {
+                return; // Already handled by showParentVideos
             }
             // Check for cluster: filter
             const clusterMatch = q.match(/^cluster:([^ ]+)$/);
             if (clusterMatch) {
                 activeClusterFilter = clusterMatch[1];
+                activeParentFilter = null;
                 semanticMatchIds = null;
                 applyFilters();
                 return;
             }
             activeClusterFilter = null;
+            activeParentFilter = null;
             // Debounce 150ms for API call (model is preloaded)
             semanticTimer = setTimeout(() => {
                 fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=200')
@@ -683,7 +868,9 @@ TEMPLATE = """
 
                 const searchOk = activeClusterFilter
                     ? v.cluster === activeClusterFilter
-                    : (semanticMatchIds === null || semanticMatchIds.has(v.id));
+                    : activeParentFilter
+                        ? activeParentFilter.has(v.cluster)
+                        : (semanticMatchIds === null || semanticMatchIds.has(v.id));
                 const starOk = !starFilterActive || starredChannels.has(v.channel);
                 const genreOk = selectedGenres.has(v.genre);
                 const passesNonGenre = dateOk && searchOk && starOk;
@@ -805,8 +992,20 @@ def create_app() -> Flask:
         channel_urls = get_channel_urls(config.db_path)
 
         # Load cluster slugs for all videos
-        from yt_brain.infrastructure.database import get_all_video_cluster_slugs
+        from yt_brain.infrastructure.database import get_all_video_cluster_slugs, get_clusters_by_category
         cluster_slugs = get_all_video_cluster_slugs(config.db_path)
+
+        # Build topic grid data: {category: [{slug, count}, ...]}
+        clusters_raw = get_clusters_by_category(config.db_path)
+        topic_grid = {}
+        for c in clusters_raw:
+            cat = c["parent_category"]
+            if cat not in topic_grid:
+                topic_grid[cat] = {"clusters": [], "total": 0}
+            topic_grid[cat]["clusters"].append({"slug": c["slug"], "count": c["count"]})
+            topic_grid[cat]["total"] += c["count"]
+        # Sort categories by total video count descending
+        topic_grid_sorted = sorted(topic_grid.items(), key=lambda x: x[1]["total"], reverse=True)
 
         videos = []
         for v in videos_raw:
@@ -906,6 +1105,11 @@ def create_app() -> Flask:
             starred_json=json.dumps(list(starred)),
             channel_urls_json=json.dumps(channel_urls),
             has_embeddings=has_embeddings,
+            topic_grid=topic_grid_sorted,
+            topic_grid_json=json.dumps(
+                {cat: {"clusters": data["clusters"], "total": data["total"]}
+                 for cat, data in topic_grid_sorted}
+            ),
         )
 
     @app.route("/images/<path:filename>")
