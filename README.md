@@ -16,10 +16,14 @@ uv sync
 # Import watch history from Google Takeout (zip or directory)
 yt-brain ingest takeout ~/Downloads/takeout-*.zip
 
-# Backfill metadata (channel names, categories, dates)
+# Backfill metadata (channel names, categories, dates, descriptions)
 yt-brain backfill-channels
 yt-brain backfill-categories
 yt-brain backfill-dates
+yt-brain backfill-descriptions
+
+# Generate semantic embeddings for search
+yt-brain embed
 
 # Launch the interactive dashboard
 yt-brain dashboard
@@ -44,6 +48,8 @@ yt-brain sync
 | `backfill-channels` | Fill missing channel names via oEmbed |
 | `backfill-dates` | Fill missing dates via YouTube Data API |
 | `backfill-categories` | Fill missing categories via YouTube Data API |
+| `backfill-descriptions` | Fill missing descriptions via YouTube Data API |
+| `embed [--rebuild]` | Generate semantic embeddings for search |
 | `dashboard [--port 5555]` | Launch web dashboard |
 | `config` | Show current configuration |
 
@@ -53,11 +59,24 @@ The web dashboard provides:
 
 - **Genre Breakdown** with checkboxes to filter by genre
 - **Channel Breakdown** with clickable links to YouTube
-- **All Videos** table with title and channel search
+- **Semantic Search** — find videos by topic or concept, not just exact words
 - **Time filter** dropdown (1 day, 1 week, 1 month, 6 months, 1-5 years, all)
 - **Date range** display based on actual watch dates
 
-All filters combine — select a year range, check specific genres, and search by title or channel simultaneously.
+All filters combine — search by topic, select a year range, check specific genres, and filter by starred channels simultaneously.
+
+### Search Syntax
+
+| Query | Behavior |
+|-------|----------|
+| `machine learning` | Semantic search — finds related videos by meaning |
+| `"kubernetes"` | Semantic + exact match on "kubernetes" in title or description |
+| `title:"Claude"` | Exact match in title only (case-insensitive) |
+| `desc:"tutorial"` | Exact match in description only |
+| `channel:"3Blue1Brown"` | Exact match in channel name |
+| `AI agents title:"python"` | Semantic search for "AI agents", filtered to titles containing "python" |
+
+Filters are combinable: `machine learning title:"python" channel:"sentdex"`
 
 ## Data Sources
 
@@ -67,6 +86,8 @@ All filters combine — select a year range, check specific genres, and search b
 | **YouTube Data API** | Video upload dates (via `backfill-dates`) |
 | **YouTube oEmbed** | Channel names (via `backfill-channels`) |
 | **yt-dlp** | Recent history, video metadata, transcripts |
+| **sentence-transformers** | Local semantic embeddings (all-MiniLM-L6-v2) |
+| **sqlite-vec** | Vector search for semantic similarity |
 
 ## Setup
 
@@ -79,7 +100,7 @@ All filters combine — select a year range, check specific genres, and search b
 
 ### YouTube Data API Key (optional)
 
-Required for `backfill-dates`, `backfill-categories`, `fetch`, and `sync` (for category/date enrichment).
+Required for `backfill-dates`, `backfill-categories`, `backfill-descriptions`, `fetch`, and `sync`.
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
 2. Enable the YouTube Data API v3
