@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections import Counter
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template_string, request, send_from_directory
 
-import sqlite3
-
 from yt_brain.infrastructure.config import load_config
-from yt_brain.infrastructure.database import get_all_videos, get_channel_urls, get_starred_channels, init_db, toggle_starred_channel
+from yt_brain.infrastructure.database import (
+    get_all_videos,
+    get_channel_urls,
+    get_starred_channels,
+    init_db,
+    toggle_starred_channel,
+)
 
 from .classifier import classify_genre, genre_stats
 
@@ -49,6 +54,7 @@ TEMPLATE = """
             --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { overflow-x: hidden; width: 100%; max-width: 100vw; }
         body {
             font-family: var(--font-body);
             background: var(--bg-base);
@@ -61,6 +67,7 @@ TEMPLATE = """
         }
         .top-section {
             position: relative;
+            overflow: hidden;
         }
         h1 {
             font-family: var(--font-display);
@@ -82,8 +89,8 @@ TEMPLATE = """
             right: 10px;
             transform: translateY(-50%);
             height: 180px;
-            opacity: 0.8;
-            filter: brightness(0.88) drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+            opacity: 0.85;
+            filter: brightness(0.9) drop-shadow(0 4px 12px rgba(0,0,0,0.4));
             transition: transform 0.3s ease, filter 0.3s ease;
             z-index: 2;
         }
@@ -98,6 +105,9 @@ TEMPLATE = """
             gap: 24px;
             margin-bottom: 32px;
             align-items: stretch;
+            overflow: hidden;
+            width: calc(100vw - 80px);
+            max-width: calc(100vw - 80px);
         }
         .card {
             background: var(--bg-surface);
@@ -108,6 +118,9 @@ TEMPLATE = """
             display: flex;
             flex-direction: column;
             max-height: 500px;
+            overflow: hidden;
+            min-width: 0;
+            contain: inline-size;
             transition: box-shadow 0.2s ease, border-color 0.2s ease;
         }
         .card:hover {
@@ -170,6 +183,9 @@ TEMPLATE = """
             font-weight: 800;
             color: var(--text-primary);
             letter-spacing: -1px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
             transition: color 0.3s ease;
         }
         .stat-box .label {
@@ -227,20 +243,29 @@ TEMPLATE = """
         .bar-cell {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .bar-track {
+            flex: 1;
+            min-width: 0;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-hover);
         }
         .bar {
-            height: 6px;
+            height: 100%;
             border-radius: 3px;
             background: var(--accent);
             transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 0 0 6px var(--accent-glow);
         }
         .bar-label {
+            flex-shrink: 0;
             font-family: var(--font-display);
             font-size: 11px;
             color: var(--text-muted);
-            min-width: 45px;
             text-align: right;
         }
         .engagement-grid {
@@ -261,15 +286,19 @@ TEMPLATE = """
         .eng-WATCHED .num { color: #f59e0b; }
         .eng-LIKED .num { color: #22c55e; }
         .eng-CURATED .num { color: var(--accent); }
-        .video-list { max-height: 1000px; overflow-y: auto; }
-        #videoTable { table-layout: fixed; }
+        .video-list { max-height: 1000px; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
+        .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); contain: inline-size; }
+        .video-list table { table-layout: fixed; width: 100%; max-width: 100%; }
         #videoTable col.col-title { width: 55%; }
         #videoTable col.col-channel { width: 25%; }
         #videoTable col.col-genre { width: 20%; }
-        #videoTable td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #videoTable td, #videoTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
+        #videoTable td a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #videoTable thead tr:first-child th { position: sticky; top: 0; background: var(--bg-surface); z-index: 2; }
         #videoTable thead tr:last-child th { position: sticky; top: 45px; background: var(--bg-surface); z-index: 1; }
+        #genreTable td, #genreTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #genreTable thead th { position: sticky; top: 0; background: var(--bg-surface); z-index: 1; }
+        #channelTable td, #channelTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #channelTable thead th { position: sticky; top: 0; background: var(--bg-surface); z-index: 1; }
         .duration { color: var(--text-muted); font-variant-numeric: tabular-nums; }
         .channel { color: var(--link-channel); }
@@ -323,9 +352,11 @@ TEMPLATE = """
         ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
         * { scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; }
-        .search-wrap { position: relative; }
+        .search-wrap { position: relative; overflow: hidden; max-width: 100%; width: 100%; min-width: 0; }
         .search-input {
             width: 100%;
+            min-width: 0;
+            max-width: 100%;
             padding: 8px 28px 8px 12px;
             background: var(--bg-elevated);
             color: var(--text-secondary);
@@ -355,7 +386,7 @@ TEMPLATE = """
 </head>
 <body>
     <div class="top-section">
-        <img src="/images/yt-brain-toon-3.png" alt="yt-brain logo" class="header-logo">
+        <img src="/images/yt-brain-toon-4.png" alt="yt-brain logo" class="header-logo">
         <h1>yt-brain Dashboard</h1>
         <p class="subtitle">
             <span id="filteredCount">{{ total_videos }}</span> videos from your YouTube history &middot; <span id="dateRangeLabel">{{ date_range }}</span>
@@ -397,9 +428,10 @@ TEMPLATE = """
         <div class="card">
             <h2>Genre Breakdown</h2>
             <div class="card-scroll">
-            <table id="genreTable">
+            <table id="genreTable" style="table-layout:fixed;width:100%">
+                <colgroup><col style="width:28px"><col style="width:35%"><col style="width:70px"><col></colgroup>
                 <thead><tr>
-                    <th style="width:28px"><input type="checkbox" id="genreSelectAll" checked onchange="toggleAllGenres(this.checked)" title="Select all / none"></th>
+                    <th><input type="checkbox" id="genreSelectAll" checked onchange="toggleAllGenres(this.checked)" title="Select all / none"></th>
                     <th>Genre</th><th>Count</th><th></th>
                 </tr></thead>
                 <tbody>
@@ -410,7 +442,7 @@ TEMPLATE = """
                     <td>{{ s.count }}</td>
                     <td>
                         <div class="bar-cell">
-                            <div class="bar" style="width: {{ s.pct * 2 }}px"></div>
+                            <div class="bar-track"><div class="bar" style="width: {{ s.pct }}%"></div></div>
                             <span class="bar-label">{{ s.pct }}%</span>
                         </div>
                     </td>
@@ -424,8 +456,9 @@ TEMPLATE = """
         <div class="card">
             <h2>Channel Breakdown</h2>
             <div class="card-scroll">
-            <table id="channelTable">
-                <thead><tr><th style="width:28px"><span id="starFilter" class="star-btn" onclick="toggleStarFilter()" title="Show starred only">&#9733;</span></th><th>Channel</th><th>Count</th><th></th></tr></thead>
+            <table id="channelTable" style="table-layout:fixed;width:100%">
+                <colgroup><col style="width:28px"><col style="width:35%"><col style="width:70px"><col></colgroup>
+                <thead><tr><th><span id="starFilter" class="star-btn" onclick="toggleStarFilter()" title="Show starred only">&#9733;</span></th><th>Channel</th><th>Count</th><th></th></tr></thead>
                 <tbody>
                 {% for c in channel_stats %}
                 <tr>
@@ -434,7 +467,7 @@ TEMPLATE = """
                     <td>{{ c.count }}</td>
                     <td>
                         <div class="bar-cell">
-                            <div class="bar" style="width: {{ c.pct * 2 }}px"></div>
+                            <div class="bar-track"><div class="bar" style="width: {{ c.pct }}%"></div></div>
                             <span class="bar-label">{{ c.pct }}%</span>
                         </div>
                     </td>
@@ -457,15 +490,14 @@ TEMPLATE = """
                     <thead>
                         <tr>
                             <th style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="titleSearch" placeholder="Search titles..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('titleSearch')">&times;</span></div></th>
-                            <th style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="channelSearch" placeholder="Search channels..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('channelSearch')">&times;</span></div></th>
-                            <th></th>
+                            <th colspan="2" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="channelSearch" placeholder="Search channels..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('channelSearch')">&times;</span></div></th>
                         </tr>
                         <tr><th>Title</th><th>Channel</th><th>Genre</th></tr>
                     </thead>
                     <tbody>
                     {% for v in videos %}
                     <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}">
-                        <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title[:65] }}</a></td>
+                        <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title }}</a></td>
                         <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
                     </tr>
@@ -620,18 +652,18 @@ TEMPLATE = """
             genreRows.forEach(tr => frag.appendChild(tr));
             genreTbody.appendChild(frag);
 
-            // Update stats
+            // Update stats (order: Top Genre, Genres, Channels, Total Videos)
             filteredCountEl.textContent = visibleCount;
-            statNumbers[0].textContent = visibleCount;
-            statNumbers[1].textContent = Object.keys(channelCounts).length;
-            statNumbers[2].textContent = Object.keys(genreCounts).length;
 
             let topGenre = '-';
             let topCount = 0;
             for (const g in genreCounts) {
                 if (genreCounts[g] > topCount) { topCount = genreCounts[g]; topGenre = g; }
             }
-            statNumbers[3].textContent = topGenre;
+            statNumbers[0].textContent = topGenre;
+            statNumbers[1].textContent = Object.keys(genreCounts).length;
+            statNumbers[2].textContent = Object.keys(channelCounts).length;
+            statNumbers[3].textContent = visibleCount;
 
             // Date range
             if (minTs !== Infinity && maxTs !== -Infinity) {
@@ -655,7 +687,7 @@ TEMPLATE = """
                     const url = channelUrls[name] || `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
                     const starred = starredChannels.has(name) ? ' starred' : '';
                     const eName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">&#9733;</span></td><td><a href="${url}" target="_blank" class="link-title">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar" style="width:${pct*2}px"></div><span class="bar-label">${pct}%</span></div></td></tr>`;
+                    return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">&#9733;</span></td><td><a href="${url}" target="_blank" class="link-title">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar-track"><div class="bar" style="width:${pct}%"></div></div><span class="bar-label">${pct}%</span></div></td></tr>`;
                 }).join('');
             }
         }
