@@ -14,6 +14,7 @@ CONFIG_DIR_ENV = "YT_BRAIN_CONFIG_DIR"
 class YtBrainConfig:
     config_dir: Path = field(default_factory=lambda: DEFAULT_CONFIG_DIR)
     youtube_api_key: str = ""
+    anthropic_api_key: str = ""
     oauth_credentials: Path = field(default_factory=lambda: DEFAULT_CONFIG_DIR / "oauth.json")
     bounce_threshold: float = 0.15
     watched_threshold: float = 0.85
@@ -47,6 +48,8 @@ def load_config() -> YtBrainConfig:
 
         if "youtube_api_key" in data:
             config.youtube_api_key = data["youtube_api_key"]
+        if "anthropic_api_key" in data:
+            config.anthropic_api_key = data["anthropic_api_key"]
         if "oauth_credentials" in data:
             config.oauth_credentials = Path(data["oauth_credentials"])
         if "thresholds" in data:
@@ -65,6 +68,7 @@ def save_config(config: YtBrainConfig) -> None:
     config.config_dir.mkdir(parents=True, exist_ok=True)
     data = {
         "youtube_api_key": config.youtube_api_key,
+        "anthropic_api_key": config.anthropic_api_key,
         "oauth_credentials": str(config.oauth_credentials),
         "thresholds": {
             "bounced_below": config.bounce_threshold,
