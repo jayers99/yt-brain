@@ -596,7 +596,7 @@ TEMPLATE = """
                 return;
             }
             // Check for cluster: filter
-            const clusterMatch = q.match(/^cluster:(\S+)$/);
+            const clusterMatch = q.match(/^cluster:([^ ]+)$/);
             if (clusterMatch) {
                 activeClusterFilter = clusterMatch[1];
                 semanticMatchIds = null;
