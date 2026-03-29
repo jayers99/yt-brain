@@ -2,7 +2,7 @@
 
 | # | Slug | Description | Status |
 |---|------|-------------|--------|
-| 1 | `semantic-search` | Backfill descriptions + embed title/description with sentence-transformers + sqlite-vec search in dashboard | Design approved |
+| 1 | `semantic-search` | Backfill descriptions + embed title/description with sentence-transformers + sqlite-vec search in dashboard | **Complete** |
 | 2 | `channel-scoring` | Score channels 0-10 from engagement signals (stars, watch frequency, completion) | Backlog |
 | 3 | `playlist-awareness` | Detect when liked/starred videos belong to a playlist; recommend full sequences | Backlog |
 | 4 | `transcript-bulk-fetch` | Bulk-fetch transcripts for starred channels or high-engagement tiers | Backlog |

@@ -1,7 +1,7 @@
 # Semantic Search Design
 
 **Date**: 2026-03-29
-**Status**: Approved
+**Status**: Complete
 **Slug**: `semantic-search`
 
 ## Problem
