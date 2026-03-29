@@ -294,9 +294,7 @@ TEMPLATE = """
         .video-list { max-height: 1000px; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
         .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); contain: inline-size; }
         .video-list table { table-layout: fixed; width: 100%; max-width: 100%; }
-        #videoTable col.col-title { width: 55%; }
-        #videoTable col.col-channel { width: 25%; }
-        #videoTable col.col-genre { width: 20%; }
+        /* Column widths set inline via colgroup */
         #videoTable td, #videoTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
         #videoTable td a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #videoTable thead tr:first-child th { position: sticky; top: 0; background: var(--bg-surface); z-index: 2; }
@@ -319,6 +317,13 @@ TEMPLATE = """
             transition: color 0.15s ease;
         }
         .link-channel:hover { color: var(--text-secondary); }
+        .link-cluster {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: 11px;
+            transition: color 0.15s ease;
+        }
+        .link-cluster:hover { color: var(--accent); }
         .filter-bar {
             display: flex;
             gap: 8px;
@@ -497,22 +502,24 @@ TEMPLATE = """
             <div class="video-list">
                 <table id="videoTable">
                     <colgroup>
-                        <col class="col-title">
-                        <col class="col-channel">
-                        <col class="col-genre">
+                        <col style="width:45%">
+                        <col style="width:20%">
+                        <col style="width:20%">
+                        <col style="width:15%">
                     </colgroup>
                     <thead>
                         <tr>
-                            <th colspan="3" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
+                            <th colspan="4" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
                         </tr>
-                        <tr><th>Title</th><th>Channel</th><th>Genre</th></tr>
+                        <tr><th>Title</th><th>Channel</th><th>Genre</th><th>Cluster</th></tr>
                     </thead>
                     <tbody>
                     {% for v in videos %}
-                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}">
+                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}" data-cluster="{{ v.cluster }}">
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title }}</a></td>
                         <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
+                        <td>{% if v.cluster %}<a href="#" class="link-cluster" onclick="filterByCluster('{{ v.cluster }}'); return false;">{{ v.cluster }}</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                     </tbody>
@@ -541,6 +548,7 @@ TEMPLATE = """
             row,
             id: row.dataset.id,
             genre: row.dataset.genre,
+            cluster: row.dataset.cluster || '',
             watchedTs: row.dataset.watched ? new Date(row.dataset.watched).getTime() : null,
             title: (row.children[0]?.textContent || '').toLowerCase(),
             channel: row.children[1]?.textContent || '',
@@ -561,10 +569,19 @@ TEMPLATE = """
         // Semantic search state
         let semanticMatchIds = null;  // null = no search active, Set = matched IDs
         let semanticTimer = null;
+        let activeClusterFilter = null;
 
         function clearSearch() {
             semanticSearchEl.value = '';
             semanticSearchEl.focus();
+            semanticMatchIds = null;
+            activeClusterFilter = null;
+            applyFilters();
+        }
+
+        function filterByCluster(slug) {
+            semanticSearchEl.value = 'cluster:' + slug;
+            activeClusterFilter = slug;
             semanticMatchIds = null;
             applyFilters();
         }
@@ -574,9 +591,19 @@ TEMPLATE = """
             const q = semanticSearchEl.value.trim();
             if (!q) {
                 semanticMatchIds = null;
+                activeClusterFilter = null;
                 applyFilters();
                 return;
             }
+            // Check for cluster: filter
+            const clusterMatch = q.match(/^cluster:(\S+)$/);
+            if (clusterMatch) {
+                activeClusterFilter = clusterMatch[1];
+                semanticMatchIds = null;
+                applyFilters();
+                return;
+            }
+            activeClusterFilter = null;
             // Debounce 150ms for API call (model is preloaded)
             semanticTimer = setTimeout(() => {
                 fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=200')
@@ -654,7 +681,9 @@ TEMPLATE = """
                     ? true
                     : (v.watchedTs !== null && v.watchedTs >= cutoffTs);
 
-                const searchOk = semanticMatchIds === null || semanticMatchIds.has(v.id);
+                const searchOk = activeClusterFilter
+                    ? v.cluster === activeClusterFilter
+                    : (semanticMatchIds === null || semanticMatchIds.has(v.id));
                 const starOk = !starFilterActive || starredChannels.has(v.channel);
                 const genreOk = selectedGenres.has(v.genre);
                 const passesNonGenre = dateOk && searchOk && starOk;
@@ -775,6 +804,10 @@ def create_app() -> Flask:
         videos_raw = get_all_videos(config.db_path)
         channel_urls = get_channel_urls(config.db_path)
 
+        # Load cluster slugs for all videos
+        from yt_brain.infrastructure.database import get_all_video_cluster_slugs
+        cluster_slugs = get_all_video_cluster_slugs(config.db_path)
+
         videos = []
         for v in videos_raw:
             dur = v.duration_seconds
@@ -794,6 +827,7 @@ def create_app() -> Flask:
                 "engagement": v.effective_engagement.value,
                 "watched_at": v.watched_at.isoformat() if v.watched_at else "",
                 "channel_url": channel_urls.get(v.channel_id, ""),
+                "cluster": cluster_slugs.get(v.youtube_id, ""),
             })
 
         stats = genre_stats(videos)
