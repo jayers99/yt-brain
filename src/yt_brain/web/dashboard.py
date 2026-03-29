@@ -13,8 +13,10 @@ from yt_brain.infrastructure.config import load_config
 from yt_brain.infrastructure.database import (
     get_all_videos,
     get_channel_urls,
+    get_embedding_count,
     get_starred_channels,
     init_db,
+    search_similar,
     toggle_starred_channel,
 )
 
@@ -501,14 +503,13 @@ TEMPLATE = """
                     </colgroup>
                     <thead>
                         <tr>
-                            <th style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="titleSearch" placeholder="Search titles..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('titleSearch')">&times;</span></div></th>
-                            <th colspan="2" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="channelSearch" placeholder="Search channels..." oninput="scheduleFilter()" class="search-input"><span class="clear-btn" onclick="clearInput('channelSearch')">&times;</span></div></th>
+                            <th colspan="3" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
                         </tr>
                         <tr><th>Title</th><th>Channel</th><th>Genre</th></tr>
                     </thead>
                     <tbody>
                     {% for v in videos %}
-                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}">
+                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}">
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title }}</a></td>
                         <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
@@ -538,6 +539,7 @@ TEMPLATE = """
         const videoRows = document.querySelectorAll('#videoTable tbody tr');
         const videoData = Array.from(videoRows).map(row => ({
             row,
+            id: row.dataset.id,
             genre: row.dataset.genre,
             watchedTs: row.dataset.watched ? new Date(row.dataset.watched).getTime() : null,
             title: (row.children[0]?.textContent || '').toLowerCase(),
@@ -547,8 +549,7 @@ TEMPLATE = """
 
         // Cache DOM refs
         const yearFilterEl = document.getElementById('yearFilter');
-        const titleSearchEl = document.getElementById('titleSearch');
-        const channelSearchEl = document.getElementById('channelSearch');
+        const semanticSearchEl = document.getElementById('semanticSearch');
         const selectAllCb = document.getElementById('genreSelectAll');
         const filteredCountEl = document.getElementById('filteredCount');
         const dateRangeEl = document.getElementById('dateRangeLabel');
@@ -557,15 +558,46 @@ TEMPLATE = """
         const channelTbody = document.getElementById('channelTable')?.querySelector('tbody');
         const genreCheckboxes = document.querySelectorAll('.genre-cb');
 
-        // Debounce for text inputs
-        let filterRafId = null;
-        function clearInput(id) {
-            const el = document.getElementById(id);
-            el.value = '';
-            el.focus();
+        // Semantic search state
+        let semanticMatchIds = null;  // null = no search active, Set = matched IDs
+        let semanticTimer = null;
+
+        function clearSearch() {
+            semanticSearchEl.value = '';
+            semanticSearchEl.focus();
+            semanticMatchIds = null;
             applyFilters();
         }
 
+        function scheduleSemanticSearch() {
+            if (semanticTimer) clearTimeout(semanticTimer);
+            const q = semanticSearchEl.value.trim();
+            if (!q) {
+                semanticMatchIds = null;
+                applyFilters();
+                return;
+            }
+            // Debounce 150ms for API call (model is preloaded)
+            semanticTimer = setTimeout(() => {
+                fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=200')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.results && data.results.length > 0) {
+                            semanticMatchIds = new Set(data.results.map(r => r.youtube_id));
+                        } else {
+                            semanticMatchIds = new Set();  // empty = nothing matches
+                        }
+                        applyFilters();
+                    })
+                    .catch(() => {
+                        semanticMatchIds = null;
+                        applyFilters();
+                    });
+            }, 300);
+        }
+
+        // Debounce for non-search filters
+        let filterRafId = null;
         function scheduleFilter() {
             if (filterRafId) cancelAnimationFrame(filterRafId);
             filterRafId = requestAnimationFrame(applyFilters);
@@ -602,8 +634,6 @@ TEMPLATE = """
                 cutoffTs = Date.now() - parseInt(days) * 86400000;
             }
 
-            const searchTerm = titleSearchEl.value.toLowerCase();
-            const channelTerm = channelSearchEl.value.toLowerCase();
             const selectedGenres = new Set();
             let checkedCount = 0;
             genreCheckboxes.forEach(cb => {
@@ -624,11 +654,10 @@ TEMPLATE = """
                     ? true
                     : (v.watchedTs !== null && v.watchedTs >= cutoffTs);
 
-                const searchOk = !searchTerm || v.title.includes(searchTerm);
-                const channelOk = !channelTerm || v.channelLower.includes(channelTerm);
+                const searchOk = semanticMatchIds === null || semanticMatchIds.has(v.id);
                 const starOk = !starFilterActive || starredChannels.has(v.channel);
                 const genreOk = selectedGenres.has(v.genre);
-                const passesNonGenre = dateOk && searchOk && channelOk && starOk;
+                const passesNonGenre = dateOk && searchOk && starOk;
                 const visible = passesNonGenre && genreOk;
 
                 v.row.style.display = visible ? '' : 'none';
@@ -823,6 +852,8 @@ def create_app() -> Flask:
             count = sum(1 for v in videos if lo <= (v["duration"] or 0) < hi)
             duration_buckets.append({"label": label, "count": count})
 
+        has_embeddings = get_embedding_count(config.db_path) > 0
+
         return render_template_string(
             TEMPLATE,
             videos=videos,
@@ -840,6 +871,7 @@ def create_app() -> Flask:
             date_range=date_range,
             starred_json=json.dumps(list(starred)),
             channel_urls_json=json.dumps(channel_urls),
+            has_embeddings=has_embeddings,
         )
 
     @app.route("/images/<path:filename>")
@@ -858,9 +890,120 @@ def create_app() -> Flask:
         is_starred = toggle_starred_channel(config.db_path, channel_name)
         return jsonify({"starred": is_starred, "channel": channel_name})
 
+    # Preload embedding model at startup if embeddings exist
+    config = load_config()
+    if get_embedding_count(config.db_path) > 0:
+        import struct as _struct
+
+        from sentence_transformers import SentenceTransformer as _ST
+
+        app._embed_model = _ST("all-MiniLM-L6-v2")
+        app._struct = _struct
+
+    @app.route("/api/search")
+    def api_search():
+        import re
+
+        config = load_config()
+
+        q = request.args.get("q", "").strip()
+        limit = min(int(request.args.get("limit", 50)), 200)
+        if not q:
+            return jsonify({"results": []})
+
+        if not hasattr(app, "_embed_model"):
+            return jsonify({"results": [], "error": "No embeddings. Run: yt-brain embed"}), 200
+
+        # Extract field-specific filters: title:"x", desc:"x", channel:"x"
+        # and bare quoted terms: "x" (matches title or description)
+        field_filters = []  # list of (field, term_lower)
+        for match in re.finditer(r'(title|desc|channel):"([^"]+)"', q):
+            field_filters.append((match.group(1), match.group(2).lower()))
+        bare_quotes = [t.lower() for t in re.findall(r'(?<![\w:])\"([^"]+)\"', re.sub(r'(title|desc|channel):"[^"]*"', '', q))]
+
+        has_filters = bool(field_filters or bare_quotes)
+
+        # Strip all filter syntax to get the semantic query
+        semantic_q = re.sub(r'(title|desc|channel):"[^"]*"', '', q)
+        semantic_q = re.sub(r'"[^"]*"', '', semantic_q).strip()
+
+        if not semantic_q and has_filters:
+            terms = [t for _, t in field_filters] + bare_quotes
+            semantic_q = " ".join(terms)
+
+        embedding = app._embed_model.encode(semantic_q)
+        query_blob = app._struct.pack(f"{len(embedding)}f", *embedding.tolist())
+
+        fetch_limit = limit * 5 if has_filters else limit
+        results = search_similar(config.db_path, query_blob, limit=fetch_limit)
+
+        if has_filters:
+            conn = sqlite3.connect(config.db_path)
+            try:
+                filtered = []
+                for vid, dist in results:
+                    row = conn.execute(
+                        "SELECT title, description, channel_id FROM videos WHERE youtube_id = ?", (vid,)
+                    ).fetchone()
+                    if not row:
+                        continue
+                    title_l, desc_l, channel_l = row[0].lower(), row[1].lower(), row[2].lower()
+
+                    ok = True
+                    for field, term in field_filters:
+                        if field == "title" and term not in title_l:
+                            ok = False
+                        elif field == "desc" and term not in desc_l:
+                            ok = False
+                        elif field == "channel" and term not in channel_l:
+                            ok = False
+                    for term in bare_quotes:
+                        if term not in title_l and term not in desc_l:
+                            ok = False
+
+                    if ok:
+                        filtered.append((vid, dist))
+                        if len(filtered) >= limit:
+                            break
+            finally:
+                conn.close()
+            results = filtered
+
+        return jsonify({
+            "results": [{"youtube_id": vid, "distance": dist} for vid, dist in results]
+        })
+
     return app
 
 
-def run_dashboard(port: int = 5555) -> None:
+def run_dashboard(port: int = 5555, open_browser: bool = False) -> None:
+    import signal
+    import sys
+    import threading
+    import webbrowser
+
+    def _handle_sigint(sig: int, frame: object) -> None:
+        print("\nShutting down dashboard...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _handle_sigint)
+
     app = create_app()
-    app.run(host="127.0.0.1", port=port, debug=False)
+
+    if open_browser:
+        url = f"http://127.0.0.1:{port}"
+
+        def _open_browser() -> None:
+            import urllib.request
+            for _ in range(30):
+                try:
+                    urllib.request.urlopen(url, timeout=1)
+                    webbrowser.open(url)
+                    return
+                except Exception:
+                    import time
+                    time.sleep(0.5)
+
+        threading.Thread(target=_open_browser, daemon=True).start()
+
+    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)

@@ -8,9 +8,11 @@ from urllib.error import URLError
 from yt_brain.infrastructure.database import (
     get_videos_missing_category,
     get_videos_missing_channel,
+    get_videos_missing_description,
     get_videos_missing_watched_at,
     update_category,
     update_channel_id,
+    update_description,
     update_watched_at,
 )
 
@@ -81,6 +83,44 @@ def backfill_categories(db_path: Path, api_key: str, video_ids: list[str] | None
                 filled += 1
         except (URLError, json.JSONDecodeError, KeyError):
             pass
+    return filled
+
+
+def backfill_descriptions(
+    db_path: Path,
+    api_key: str,
+    limit: int | None = None,
+    on_progress: callable | None = None,
+) -> int:
+    """Backfill missing video descriptions via YouTube Data API (batches of 50).
+
+    Returns the number of descriptions successfully backfilled.
+    """
+    missing = get_videos_missing_description(db_path)
+    if limit is not None:
+        missing = missing[:limit]
+
+    filled = 0
+    total = len(missing)
+    for i in range(0, total, 50):
+        batch = missing[i : i + 50]
+        ids = ",".join(batch)
+        try:
+            api_url = (
+                f"https://www.googleapis.com/youtube/v3/videos"
+                f"?part=snippet&id={ids}&key={api_key}"
+            )
+            resp = urllib.request.urlopen(api_url, timeout=15)
+            data = json.loads(resp.read())
+            for item in data.get("items", []):
+                desc = item["snippet"].get("description", "")
+                if desc:
+                    update_description(db_path, item["id"], desc)
+                    filled += 1
+        except (URLError, json.JSONDecodeError, KeyError):
+            pass
+        if on_progress:
+            on_progress(min(i + 50, total), total)
     return filled
 
 

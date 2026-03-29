@@ -534,6 +534,65 @@ def backfill_dates() -> None:
     console.print(f"[green]Backfilled {filled}/{missing_count} video dates.[/green]")
 
 
+@app.command()
+def embed(
+    rebuild: Annotated[bool, typer.Option("--rebuild", help="Regenerate all embeddings")] = False,
+) -> None:
+    """Generate semantic embeddings for video titles and descriptions."""
+    from yt_brain.application.embed import embed_videos
+    from yt_brain.infrastructure.database import get_embedding_count, get_videos_for_embedding
+
+    db_path = _get_db_path()
+    _ensure_db(db_path)
+
+    pending = len(get_videos_for_embedding(db_path, rebuild=rebuild))
+    if not pending:
+        count = get_embedding_count(db_path)
+        console.print(f"[green]All {count} videos already have embeddings.[/green]")
+        return
+
+    console.print(f"[dim]Embedding {pending} videos (this may take a minute)...[/dim]")
+
+    def on_progress(done: int, total: int) -> None:
+        console.print(f"  [dim]{done}/{total}[/dim]")
+
+    embedded = embed_videos(db_path, rebuild=rebuild, on_progress=on_progress)
+    total = get_embedding_count(db_path)
+    console.print(f"[green]Embedded {embedded} videos. Total embeddings: {total}[/green]")
+
+
+@app.command("backfill-descriptions")
+def backfill_descriptions(
+    limit: Annotated[int | None, typer.Option("--limit", "-n", help="Max videos to backfill")] = None,
+) -> None:
+    """Backfill missing video descriptions via YouTube Data API."""
+    from yt_brain.application.backfill import backfill_descriptions as do_backfill
+    from yt_brain.infrastructure.config import load_config
+    from yt_brain.infrastructure.database import get_videos_missing_description
+
+    config = load_config()
+    if not config.youtube_api_key:
+        err_console.print("[red]No YouTube API key configured. Run: yt-brain config[/red]")
+        raise typer.Exit(1)
+
+    db_path = config.db_path
+    _ensure_db(db_path)
+
+    missing_count = len(get_videos_missing_description(db_path))
+    if not missing_count:
+        console.print("[green]All videos have descriptions.[/green]")
+        return
+
+    target = min(missing_count, limit) if limit else missing_count
+    console.print(f"[dim]Backfilling descriptions for {target}/{missing_count} videos via YouTube API (batches of 50)...[/dim]")
+
+    def on_progress(done: int, total: int) -> None:
+        console.print(f"  [dim]{done}/{total}[/dim]")
+
+    filled = do_backfill(db_path, config.youtube_api_key, limit=limit, on_progress=on_progress)
+    console.print(f"[green]Backfilled {filled}/{target} descriptions.[/green]")
+
+
 @app.command("backfill-channels")
 def backfill_channels() -> None:
     """Backfill missing channel names via YouTube oEmbed API."""
@@ -558,17 +617,13 @@ def dashboard(
     port: Annotated[int, typer.Option("--port", "-p", help="Port to serve on")] = 5555,
 ) -> None:
     """Launch the yt-brain dashboard in your browser."""
-    import webbrowser
-
     from yt_brain.web.dashboard import run_dashboard
 
     db_path = _get_db_path()
     _ensure_db(db_path)
 
-    url = f"http://127.0.0.1:{port}"
-    console.print(f"[green]Launching dashboard at {url}[/green]")
-    webbrowser.open(url)
-    run_dashboard(port=port)
+    console.print(f"[dim]Loading model and starting dashboard on port {port}...[/dim]")
+    run_dashboard(port=port, open_browser=True)
 
 
 if __name__ == "__main__":

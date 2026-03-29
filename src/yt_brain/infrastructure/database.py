@@ -9,6 +9,19 @@ from yt_brain.domain.errors import DatabaseError
 from yt_brain.domain.models import EngagementLevel, Source, Video
 
 
+def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
+    """Load the sqlite-vec extension into a connection."""
+    import sqlite_vec
+
+    conn.enable_load_extension(True)
+    sqlite_vec.load(conn)
+    conn.enable_load_extension(False)
+
+
+# Migrations that require sqlite-vec loaded before they can run.
+_VEC_MIGRATIONS = {4}
+
+
 def init_db(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -30,6 +43,8 @@ def init_db(db_path: Path) -> None:
             # Extract version number from filename (e.g., 002_starred_channels.sql -> 2)
             version = int(mig_file.name.split("_")[0])
             if version > current_version:
+                if version in _VEC_MIGRATIONS:
+                    _load_sqlite_vec(conn)
                 conn.executescript(mig_file.read_text())
     finally:
         conn.close()
@@ -276,11 +291,92 @@ def is_video_in_playlist(db_path: Path, youtube_id: str) -> bool:
         conn.close()
 
 
+def get_videos_missing_description(db_path: Path) -> list[str]:
+    """Return youtube_ids for videos with empty descriptions."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("SELECT youtube_id FROM videos WHERE description = '' OR description IS NULL")
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def update_description(db_path: Path, youtube_id: str, description: str) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE videos SET description = ?, updated_at = datetime('now') WHERE youtube_id = ?",
+            (description, youtube_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def is_video_liked(db_path: Path, youtube_id: str) -> bool:
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.execute("SELECT 1 FROM videos WHERE youtube_id = ? AND engagement_level = 'LIKED'", (youtube_id,))
         return cursor.fetchone() is not None
+    finally:
+        conn.close()
+
+
+def get_videos_for_embedding(db_path: Path, rebuild: bool = False) -> list[tuple[str, str, str]]:
+    """Return (youtube_id, title, description) for videos needing embeddings.
+
+    If rebuild=True, returns all videos. Otherwise only those not in video_embeddings.
+    """
+    conn = sqlite3.connect(db_path)
+    _load_sqlite_vec(conn)
+    try:
+        if rebuild:
+            cursor = conn.execute("SELECT youtube_id, title, description FROM videos")
+        else:
+            cursor = conn.execute(
+                "SELECT v.youtube_id, v.title, v.description FROM videos v "
+                "WHERE v.youtube_id NOT IN (SELECT youtube_id FROM video_embeddings)"
+            )
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+
+def insert_embeddings(db_path: Path, rows: list[tuple[str, bytes]]) -> None:
+    """Insert (youtube_id, embedding_bytes) into video_embeddings."""
+    conn = sqlite3.connect(db_path)
+    _load_sqlite_vec(conn)
+    try:
+        conn.executemany(
+            "INSERT OR REPLACE INTO video_embeddings (youtube_id, embedding) VALUES (?, ?)",
+            rows,
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def search_similar(db_path: Path, query_embedding: bytes, limit: int = 20) -> list[tuple[str, float]]:
+    """Return (youtube_id, distance) for nearest neighbors."""
+    conn = sqlite3.connect(db_path)
+    _load_sqlite_vec(conn)
+    try:
+        cursor = conn.execute(
+            "SELECT youtube_id, distance FROM video_embeddings "
+            "WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
+            (query_embedding, limit),
+        )
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+
+def get_embedding_count(db_path: Path) -> int:
+    conn = sqlite3.connect(db_path)
+    _load_sqlite_vec(conn)
+    try:
+        cursor = conn.execute("SELECT COUNT(*) FROM video_embeddings")
+        return cursor.fetchone()[0]
     finally:
         conn.close()
 

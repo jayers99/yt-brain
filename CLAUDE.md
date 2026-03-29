@@ -27,6 +27,8 @@ yt-brain transcript <video_id>     # Fetch transcript via yt-dlp
 yt-brain backfill-channels         # Fill channel names via oEmbed
 yt-brain backfill-dates            # Fill dates via YouTube Data API
 yt-brain backfill-categories       # Fill YouTube categories via Data API
+yt-brain backfill-descriptions     # Fill video descriptions via yt-dlp
+yt-brain embed [--rebuild]         # Generate semantic embeddings (sqlite-vec)
 yt-brain config                    # Show/set configuration
 ```
 
@@ -50,6 +52,7 @@ Hexagonal architecture:
 | `src/yt_brain/infrastructure/ytdlp_adapter.py` | yt-dlp for history, metadata, transcripts |
 | `src/yt_brain/web/dashboard.py` | Flask web dashboard |
 | `src/yt_brain/web/classifier.py` | Keyword-based genre classifier (fallback) |
+| `src/yt_brain/application/embed.py` | Semantic embedding service (sentence-transformers) |
 | `tests/features/` | BDD scenarios |
 
 ## Data
@@ -59,3 +62,4 @@ Hexagonal architecture:
 - YouTube API key stored in config (not in repo)
 - Migrations in `migrations/` — auto-applied by `init_db` on startup
 - Starred channels persisted in `starred_channels` table
+- Vector embeddings in `video_embeddings` table (sqlite-vec, 384-dim, all-MiniLM-L6-v2)
