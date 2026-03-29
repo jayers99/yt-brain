@@ -30,7 +30,8 @@ TEMPLATE = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <!-- chart.js removed — not used, saves ~200KB parse -->
+
     <style>
         :root {
             --bg-base: #0c0c0e;
@@ -120,7 +121,8 @@ TEMPLATE = """
             max-height: 500px;
             overflow: hidden;
             min-width: 0;
-            contain: inline-size;
+            contain: layout style paint inline-size;
+            will-change: transform;
             transition: box-shadow 0.2s ease, border-color 0.2s ease;
         }
         .card:hover {
@@ -260,7 +262,6 @@ TEMPLATE = """
             border-radius: 3px;
             background: var(--accent);
             transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 0 6px var(--accent-glow);
         }
         .bar-label {
             flex-shrink: 0;
@@ -384,6 +385,15 @@ TEMPLATE = """
             border-left-color: var(--accent);
         }
         .card-scroll { overflow-y: auto; flex: 1; }
+        /* Skip rendering off-screen video rows — huge win for large lists */
+        #videoTable tbody tr {
+            content-visibility: auto;
+            contain-intrinsic-size: auto 37px;
+        }
+        /* Suppress ALL transitions during resize to avoid per-frame composite work */
+        .resizing, .resizing * {
+            transition: none !important;
+        }
     </style>
 </head>
 <body>
@@ -511,6 +521,14 @@ TEMPLATE = """
     </div>
 
     <script>
+        // Suppress transitions during resize to avoid jank
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            document.body.classList.add('resizing');
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => document.body.classList.remove('resizing'), 150);
+        });
+
         const starredChannels = new Set({{ starred_json | safe }});
         const channelUrls = {{ channel_urls_json | safe }};
 
