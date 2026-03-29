@@ -532,6 +532,34 @@ def bulk_assign_clusters(db_path: Path, assignments: list[tuple[str, int]]) -> N
         conn.close()
 
 
+def update_cluster_categories(db_path: Path, categories: dict[str, str]) -> None:
+    """Update parent_category for clusters. categories = {slug: parent_category}."""
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executemany(
+            "UPDATE video_clusters SET parent_category = ? WHERE slug = ?",
+            [(cat, slug) for slug, cat in categories.items()],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_clusters_by_category(db_path: Path) -> list[dict]:
+    """Return clusters grouped by parent_category with counts."""
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT vc.slug, vc.parent_category, COUNT(v.youtube_id) as count "
+            "FROM video_clusters vc "
+            "LEFT JOIN videos v ON v.cluster_id = vc.cluster_id "
+            "GROUP BY vc.cluster_id ORDER BY count DESC"
+        ).fetchall()
+        return [{"slug": r[0], "parent_category": r[1] or "Other", "count": r[2]} for r in rows]
+    finally:
+        conn.close()
+
+
 def get_all_video_cluster_slugs(db_path: Path) -> dict[str, str]:
     """Return {youtube_id: cluster_slug} for all videos with a cluster."""
     conn = sqlite3.connect(db_path)
