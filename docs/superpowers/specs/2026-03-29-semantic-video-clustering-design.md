@@ -49,7 +49,7 @@ Anthropic API key stored in `config.yaml` alongside existing YouTube API key.
 
 **Incremental (default):**
 - Assigns new/unassigned videos to nearest existing cluster by cosine distance to centroid
-- If distance exceeds a threshold, video remains unassigned
+- If cosine distance to nearest centroid exceeds 0.5, video remains unassigned (tunable constant)
 - No re-clustering, no new slug generation
 
 **Full rebuild (`--rebuild`):**
