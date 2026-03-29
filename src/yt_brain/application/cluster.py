@@ -16,6 +16,7 @@ from yt_brain.infrastructure.database import (
     get_embeddings_for_ids,
     get_unassigned_video_ids,
     save_cluster,
+    update_cluster_categories,
 )
 from yt_brain.domain.models import Cluster
 
@@ -107,6 +108,44 @@ def _generate_slug(
     return f"{slug}-{i}"
 
 
+def _generate_parent_categories(slugs: list[str], api_key: str) -> dict[str, str]:
+    """Ask Claude to group cluster slugs into ~12-15 parent categories.
+
+    Returns {slug: parent_category_name}.
+    """
+    import anthropic
+    import json
+
+    client = anthropic.Anthropic(api_key=api_key)
+    slugs_text = "\n".join(f"- {s}" for s in slugs)
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=4096,
+        system=(
+            "You are a categorization assistant. You receive a list of topic cluster slugs "
+            "and must group them into 10-15 broad parent categories. "
+            "Respond with ONLY valid JSON: an object where keys are slug strings and values "
+            "are short parent category names (2-3 words, Title Case). "
+            "Example: {\"film-photography\": \"Photography\", \"sony-lens-reviews\": \"Photography\", "
+            "\"claude-code-workflows\": \"Tech & Dev\"}"
+        ),
+        messages=[{
+            "role": "user",
+            "content": f"Group these cluster slugs into 10-15 parent categories:\n\n{slugs_text}",
+        }],
+    )
+    text = message.content[0].text.strip()
+
+    try:
+        result = json.loads(text)
+        if isinstance(result, dict):
+            return {k: v for k, v in result.items() if k in slugs}
+    except json.JSONDecodeError:
+        pass
+
+    return {s: "Other" for s in slugs}
+
+
 def cluster_videos(
     db_path: Path,
     api_key: str,
@@ -173,6 +212,14 @@ def cluster_videos(
         if labels[j] != -1:
             assignments.append((vid_id, label_to_cluster_id[labels[j]]))
     bulk_assign_clusters(db_path, assignments)
+
+    # Generate parent categories
+    if api_key and existing_slugs:
+        try:
+            categories = _generate_parent_categories(list(existing_slugs), api_key)
+            update_cluster_categories(db_path, categories)
+        except Exception:
+            pass  # Non-critical, clusters still work without categories
 
     return len(unique_labels)
 
