@@ -55,6 +55,12 @@ class Video(BaseModel):
         return self.watched_seconds / self.duration_seconds
 
 
+class Cluster(BaseModel):
+    cluster_id: int | None = None
+    slug: str
+    centroid: bytes
+
+
 class Channel(BaseModel):
     youtube_id: str
     name: str

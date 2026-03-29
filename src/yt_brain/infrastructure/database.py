@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from yt_brain.domain.errors import DatabaseError
-from yt_brain.domain.models import EngagementLevel, Source, Video
+from yt_brain.domain.models import Cluster, EngagementLevel, Source, Video
 
 
 def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
@@ -19,7 +19,7 @@ def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
 
 
 # Migrations that require sqlite-vec loaded before they can run.
-_VEC_MIGRATIONS = {4}
+_VEC_MIGRATIONS = {4, 5}
 
 
 def init_db(db_path: Path) -> None:
@@ -377,6 +377,171 @@ def get_embedding_count(db_path: Path) -> int:
     try:
         cursor = conn.execute("SELECT COUNT(*) FROM video_embeddings")
         return cursor.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def save_cluster(db_path: Path, cluster: Cluster) -> int:
+    """Insert a cluster and return its cluster_id."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute(
+            "INSERT INTO video_clusters (slug, centroid) VALUES (?, ?)",
+            (cluster.slug, cluster.centroid),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+
+def get_cluster_by_slug(db_path: Path, slug: str) -> Cluster | None:
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT cluster_id, slug, centroid FROM video_clusters WHERE slug = ?",
+            (slug,),
+        ).fetchone()
+        if row is None:
+            return None
+        return Cluster(cluster_id=row[0], slug=row[1], centroid=row[2])
+    finally:
+        conn.close()
+
+
+def assign_video_to_cluster(db_path: Path, youtube_id: str, cluster_id: int) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE videos SET cluster_id = ? WHERE youtube_id = ?",
+            (cluster_id, youtube_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_video_cluster_slug(db_path: Path, youtube_id: str) -> str | None:
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT vc.slug FROM videos v "
+            "JOIN video_clusters vc ON v.cluster_id = vc.cluster_id "
+            "WHERE v.youtube_id = ?",
+            (youtube_id,),
+        ).fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+def get_clusters_with_counts(db_path: Path) -> list[dict]:
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT vc.slug, COUNT(v.youtube_id) as count "
+            "FROM video_clusters vc "
+            "LEFT JOIN videos v ON v.cluster_id = vc.cluster_id "
+            "GROUP BY vc.cluster_id ORDER BY count DESC"
+        ).fetchall()
+        return [{"slug": row[0], "count": row[1]} for row in rows]
+    finally:
+        conn.close()
+
+
+def rename_cluster(db_path: Path, old_slug: str, new_slug: str) -> bool:
+    """Rename a cluster slug. Returns True if found and renamed."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute(
+            "UPDATE video_clusters SET slug = ? WHERE slug = ?",
+            (new_slug, old_slug),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def delete_all_clusters(db_path: Path) -> None:
+    """Remove all clusters and assignments (for rebuild)."""
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("UPDATE videos SET cluster_id = NULL")
+        conn.execute("DELETE FROM video_clusters")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_all_embeddings(db_path: Path) -> list[tuple[str, bytes]]:
+    """Return all (youtube_id, embedding) from video_embeddings."""
+    conn = sqlite3.connect(db_path)
+    _load_sqlite_vec(conn)
+    try:
+        rows = conn.execute(
+            "SELECT youtube_id, embedding FROM video_embeddings"
+        ).fetchall()
+        return rows
+    finally:
+        conn.close()
+
+
+def get_unassigned_video_ids(db_path: Path) -> list[str]:
+    """Return youtube_ids of videos that have embeddings but no cluster."""
+    conn = sqlite3.connect(db_path)
+    _load_sqlite_vec(conn)
+    try:
+        rows = conn.execute(
+            "SELECT ve.youtube_id FROM video_embeddings ve "
+            "JOIN videos v ON v.youtube_id = ve.youtube_id "
+            "WHERE v.cluster_id IS NULL"
+        ).fetchall()
+        return [r[0] for r in rows]
+    finally:
+        conn.close()
+
+
+def get_embeddings_for_ids(db_path: Path, youtube_ids: list[str]) -> list[tuple[str, bytes]]:
+    """Return (youtube_id, embedding) for specific video IDs."""
+    if not youtube_ids:
+        return []
+    conn = sqlite3.connect(db_path)
+    _load_sqlite_vec(conn)
+    try:
+        placeholders = ",".join("?" * len(youtube_ids))
+        rows = conn.execute(
+            f"SELECT youtube_id, embedding FROM video_embeddings WHERE youtube_id IN ({placeholders})",
+            youtube_ids,
+        ).fetchall()
+        return rows
+    finally:
+        conn.close()
+
+
+def bulk_assign_clusters(db_path: Path, assignments: list[tuple[str, int]]) -> None:
+    """Bulk assign videos to clusters. assignments = [(youtube_id, cluster_id), ...]."""
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executemany(
+            "UPDATE videos SET cluster_id = ? WHERE youtube_id = ?",
+            [(cid, vid) for vid, cid in assignments],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_all_video_cluster_slugs(db_path: Path) -> dict[str, str]:
+    """Return {youtube_id: cluster_slug} for all videos with a cluster."""
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT v.youtube_id, vc.slug FROM videos v "
+            "JOIN video_clusters vc ON v.cluster_id = vc.cluster_id "
+            "WHERE v.cluster_id IS NOT NULL"
+        ).fetchall()
+        return {r[0]: r[1] for r in rows}
     finally:
         conn.close()
 
