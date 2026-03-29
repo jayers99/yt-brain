@@ -29,6 +29,9 @@ yt-brain backfill-dates            # Fill dates via YouTube Data API
 yt-brain backfill-categories       # Fill YouTube categories via Data API
 yt-brain backfill-descriptions     # Fill video descriptions via yt-dlp
 yt-brain embed [--rebuild]         # Generate semantic embeddings (sqlite-vec)
+yt-brain cluster [--rebuild] [--min-cluster-size 5]  # Run video clustering
+yt-brain cluster list              # Show clusters with counts
+yt-brain cluster rename <old> <new>  # Rename a cluster slug
 yt-brain config                    # Show/set configuration
 ```
 
@@ -53,6 +56,7 @@ Hexagonal architecture:
 | `src/yt_brain/web/dashboard.py` | Flask web dashboard |
 | `src/yt_brain/web/classifier.py` | Keyword-based genre classifier (fallback) |
 | `src/yt_brain/application/embed.py` | Semantic embedding service (sentence-transformers) |
+| `src/yt_brain/application/cluster.py` | HDBSCAN clustering + Claude slug generation |
 | `tests/features/` | BDD scenarios |
 
 ## Data
@@ -60,6 +64,8 @@ Hexagonal architecture:
 - SQLite DB: `~/.config/yt-brain/yt-brain.db`
 - Config: `~/.config/yt-brain/config.yaml`
 - YouTube API key stored in config (not in repo)
+- Anthropic API key stored in config (for cluster slug generation)
 - Migrations in `migrations/` — auto-applied by `init_db` on startup
 - Starred channels persisted in `starred_channels` table
 - Vector embeddings in `video_embeddings` table (sqlite-vec, 384-dim, all-MiniLM-L6-v2)
+- Cluster assignments in `video_clusters` table + `videos.cluster_id` FK
