@@ -294,9 +294,7 @@ TEMPLATE = """
         .video-list { max-height: 1000px; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
         .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); contain: inline-size; }
         .video-list table { table-layout: fixed; width: 100%; max-width: 100%; }
-        #videoTable col.col-title { width: 55%; }
-        #videoTable col.col-channel { width: 25%; }
-        #videoTable col.col-genre { width: 20%; }
+        /* Column widths set inline via colgroup */
         #videoTable td, #videoTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
         #videoTable td a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #videoTable thead tr:first-child th { position: sticky; top: 0; background: var(--bg-surface); z-index: 2; }
@@ -319,6 +317,87 @@ TEMPLATE = """
             transition: color 0.15s ease;
         }
         .link-channel:hover { color: var(--text-secondary); }
+        .link-cluster {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: 11px;
+            transition: color 0.15s ease;
+        }
+        .link-cluster:hover { color: var(--accent); }
+        /* Topic Grid */
+        .topic-breadcrumb {
+            font-size: 13px;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+        .topic-breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .topic-breadcrumb a:hover { text-decoration: underline; }
+        .topic-breadcrumb > span::before { content: '  \\203A  '; color: var(--text-tertiary); margin: 0 4px; }
+        .topic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        .topic-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .topic-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+        .topic-card-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        .topic-card-meta {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+        .topic-card-preview {
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .topic-expanded-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .topic-expanded-list a {
+            display: inline-block;
+            padding: 6px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 16px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .topic-expanded-list a:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .topic-show-all {
+            display: inline-block;
+            font-size: 12px;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .topic-show-all:hover { text-decoration: underline; }
         .filter-bar {
             display: flex;
             gap: 8px;
@@ -492,27 +571,52 @@ TEMPLATE = """
             </div>
         </div>
 
+        {% if topic_grid %}
+        <div class="card card-primary full-width" id="topicGridCard">
+            <div id="topicBreadcrumb" class="topic-breadcrumb" style="display:none">
+                <a href="#" onclick="topicGridReset(); return false;">All</a>
+                <span id="breadcrumbParent"></span>
+                <span id="breadcrumbChild"></span>
+            </div>
+            <h2 id="topicGridTitle">Browse by Topic Clusters</h2>
+            <div id="topicGrid" class="topic-grid">
+                {% for cat, data in topic_grid %}
+                <div class="topic-card" data-category="{{ cat }}">
+                    <div class="topic-card-name">{{ cat }}</div>
+                    <div class="topic-card-meta">{{ data.total }} videos &middot; {{ data.clusters|length }} clusters</div>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="topicExpanded" class="topic-expanded" style="display:none">
+                <div id="topicExpandedList" class="topic-expanded-list"></div>
+                <a href="#" id="topicShowAll" class="topic-show-all" onclick="return false;">Show all videos</a>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card card-primary full-width">
             <h2>All Videos</h2>
             <div class="video-list">
                 <table id="videoTable">
                     <colgroup>
-                        <col class="col-title">
-                        <col class="col-channel">
-                        <col class="col-genre">
+                        <col style="width:45%">
+                        <col style="width:20%">
+                        <col style="width:20%">
+                        <col style="width:15%">
                     </colgroup>
                     <thead>
                         <tr>
-                            <th colspan="3" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
+                            <th colspan="4" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
                         </tr>
-                        <tr><th>Title</th><th>Channel</th><th>Genre</th></tr>
+                        <tr><th>Title</th><th>Channel</th><th>Genre</th><th>Cluster</th></tr>
                     </thead>
                     <tbody>
                     {% for v in videos %}
-                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}">
+                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}" data-cluster="{{ v.cluster }}">
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title }}</a></td>
                         <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
+                        <td>{% if v.cluster %}<a href="#" class="link-cluster" onclick="filterByCluster('{{ v.cluster }}'); return false;">{{ v.cluster }}</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                     </tbody>
@@ -541,6 +645,7 @@ TEMPLATE = """
             row,
             id: row.dataset.id,
             genre: row.dataset.genre,
+            cluster: row.dataset.cluster || '',
             watchedTs: row.dataset.watched ? new Date(row.dataset.watched).getTime() : null,
             title: (row.children[0]?.textContent || '').toLowerCase(),
             channel: row.children[1]?.textContent || '',
@@ -561,10 +666,133 @@ TEMPLATE = """
         // Semantic search state
         let semanticMatchIds = null;  // null = no search active, Set = matched IDs
         let semanticTimer = null;
+        let activeClusterFilter = null;
+        let activeParentFilter = null;
+
+        // Topic Grid data and navigation
+        const topicGridData = {{ topic_grid_json | safe }};
+
+        // Event delegation for topic card clicks
+        const topicGridEl = document.getElementById('topicGrid');
+        if (topicGridEl) {
+            topicGridEl.addEventListener('click', function(e) {
+                const card = e.target.closest('.topic-card');
+                if (card) expandCategory(card.dataset.category);
+            });
+        }
+
+        function topicGridReset() {
+            document.getElementById('topicGrid').style.display = 'grid';
+            document.getElementById('topicExpanded').style.display = 'none';
+            document.getElementById('topicBreadcrumb').style.display = 'none';
+            document.getElementById('topicGridTitle').style.display = '';
+            document.getElementById('topicGridTitle').textContent = 'Browse by Topic Clusters';
+            activeClusterFilter = null;
+            activeParentFilter = null;
+            semanticSearchEl.value = '';
+            semanticMatchIds = null;
+            applyFilters();
+        }
+
+        function _makeBreadcrumbParent(cat) {
+            const a = document.createElement('a');
+            a.href = '#';
+            a.textContent = cat;
+            a.addEventListener('click', function(e) { e.preventDefault(); expandCategory(cat); });
+            const span = document.getElementById('breadcrumbParent');
+            span.innerHTML = '';
+            span.appendChild(a);
+        }
+
+        function _makeBreadcrumbParentForFilter(cat) {
+            const a = document.createElement('a');
+            a.href = '#';
+            a.textContent = cat;
+            a.addEventListener('click', function(e) { e.preventDefault(); expandCategory(cat); });
+            const span = document.getElementById('breadcrumbParent');
+            span.innerHTML = '';
+            span.appendChild(a);
+        }
+
+        function expandCategory(cat) {
+            const data = topicGridData[cat];
+            if (!data) return;
+
+            document.getElementById('topicGrid').style.display = 'none';
+            document.getElementById('topicExpanded').style.display = 'block';
+            document.getElementById('topicBreadcrumb').style.display = 'block';
+            document.getElementById('topicGridTitle').style.display = 'none';
+            _makeBreadcrumbParent(cat);
+            document.getElementById('breadcrumbChild').innerHTML = '';
+
+            const list = document.getElementById('topicExpandedList');
+            list.innerHTML = '';
+            data.clusters.forEach(function(c) {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.innerHTML = c.slug + ' <span style="color:var(--text-tertiary)">(' + c.count + ')</span>';
+                a.addEventListener('click', function(e) { e.preventDefault(); selectChildCluster(cat, c.slug); });
+                list.appendChild(a);
+            });
+
+            const showAll = document.getElementById('topicShowAll');
+            showAll.textContent = 'Show all ' + data.total + ' ' + cat + ' videos';
+            showAll.onclick = function() { showParentVideos(cat); return false; };
+
+            // Don't filter yet - just show the expanded view
+            activeClusterFilter = null;
+            activeParentFilter = null;
+            semanticSearchEl.value = '';
+            semanticMatchIds = null;
+            applyFilters();
+        }
+
+        function showParentVideos(cat) {
+            const data = topicGridData[cat];
+            if (!data) return;
+
+            document.getElementById('topicBreadcrumb').style.display = 'block';
+            _makeBreadcrumbParentForFilter(cat);
+            document.getElementById('breadcrumbChild').innerHTML = '';
+
+            // Filter to all clusters in this category
+            const slugs = new Set(data.clusters.map(c => c.slug));
+            activeParentFilter = slugs;
+            activeClusterFilter = null;
+            semanticSearchEl.value = 'category:' + cat;
+            semanticMatchIds = null;
+            applyFilters();
+        }
+
+        function selectChildCluster(cat, slug) {
+            document.getElementById('topicBreadcrumb').style.display = 'block';
+            _makeBreadcrumbParent(cat);
+            const childSpan = document.getElementById('breadcrumbChild');
+            childSpan.innerHTML = '';
+            const s = document.createElement('span');
+            s.style.color = 'var(--text-primary)';
+            s.textContent = slug;
+            childSpan.appendChild(s);
+
+            activeClusterFilter = slug;
+            activeParentFilter = null;
+            semanticSearchEl.value = 'cluster:' + slug;
+            semanticMatchIds = null;
+            applyFilters();
+        }
 
         function clearSearch() {
             semanticSearchEl.value = '';
             semanticSearchEl.focus();
+            semanticMatchIds = null;
+            activeClusterFilter = null;
+            activeParentFilter = null;
+            topicGridReset();
+        }
+
+        function filterByCluster(slug) {
+            semanticSearchEl.value = 'cluster:' + slug;
+            activeClusterFilter = slug;
             semanticMatchIds = null;
             applyFilters();
         }
@@ -574,9 +802,26 @@ TEMPLATE = """
             const q = semanticSearchEl.value.trim();
             if (!q) {
                 semanticMatchIds = null;
+                activeClusterFilter = null;
+                activeParentFilter = null;
                 applyFilters();
                 return;
             }
+            // Check for category: filter (from parent click)
+            if (q.startsWith('category:')) {
+                return; // Already handled by showParentVideos
+            }
+            // Check for cluster: filter
+            const clusterMatch = q.match(/^cluster:([^ ]+)$/);
+            if (clusterMatch) {
+                activeClusterFilter = clusterMatch[1];
+                activeParentFilter = null;
+                semanticMatchIds = null;
+                applyFilters();
+                return;
+            }
+            activeClusterFilter = null;
+            activeParentFilter = null;
             // Debounce 150ms for API call (model is preloaded)
             semanticTimer = setTimeout(() => {
                 fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=200')
@@ -654,7 +899,11 @@ TEMPLATE = """
                     ? true
                     : (v.watchedTs !== null && v.watchedTs >= cutoffTs);
 
-                const searchOk = semanticMatchIds === null || semanticMatchIds.has(v.id);
+                const searchOk = activeClusterFilter
+                    ? v.cluster === activeClusterFilter
+                    : activeParentFilter
+                        ? activeParentFilter.has(v.cluster)
+                        : (semanticMatchIds === null || semanticMatchIds.has(v.id));
                 const starOk = !starFilterActive || starredChannels.has(v.channel);
                 const genreOk = selectedGenres.has(v.genre);
                 const passesNonGenre = dateOk && searchOk && starOk;
@@ -775,6 +1024,26 @@ def create_app() -> Flask:
         videos_raw = get_all_videos(config.db_path)
         channel_urls = get_channel_urls(config.db_path)
 
+        # Load cluster slugs for all videos
+        from yt_brain.infrastructure.database import get_all_video_cluster_slugs, get_clusters_by_category
+        cluster_slugs = get_all_video_cluster_slugs(config.db_path)
+
+        # Build topic grid data: {category: [{slug, count}, ...]}
+        clusters_raw = get_clusters_by_category(config.db_path)
+        topic_grid = {}
+        for c in clusters_raw:
+            # Skip numeric fallback clusters (cluster-01, cluster-02, etc.)
+            import re as _re
+            if _re.match(r"^cluster-\d+$", c["slug"]):
+                continue
+            cat = c["parent_category"]
+            if cat not in topic_grid:
+                topic_grid[cat] = {"clusters": [], "total": 0}
+            topic_grid[cat]["clusters"].append({"slug": c["slug"], "count": c["count"]})
+            topic_grid[cat]["total"] += c["count"]
+        # Sort categories by total video count descending
+        topic_grid_sorted = sorted(topic_grid.items(), key=lambda x: x[1]["total"], reverse=True)
+
         videos = []
         for v in videos_raw:
             dur = v.duration_seconds
@@ -794,6 +1063,7 @@ def create_app() -> Flask:
                 "engagement": v.effective_engagement.value,
                 "watched_at": v.watched_at.isoformat() if v.watched_at else "",
                 "channel_url": channel_urls.get(v.channel_id, ""),
+                "cluster": cluster_slugs.get(v.youtube_id, ""),
             })
 
         stats = genre_stats(videos)
@@ -872,6 +1142,11 @@ def create_app() -> Flask:
             starred_json=json.dumps(list(starred)),
             channel_urls_json=json.dumps(channel_urls),
             has_embeddings=has_embeddings,
+            topic_grid=topic_grid_sorted,
+            topic_grid_json=json.dumps(
+                {cat: {"clusters": data["clusters"], "total": data["total"]}
+                 for cat, data in topic_grid_sorted}
+            ),
         )
 
     @app.route("/images/<path:filename>")

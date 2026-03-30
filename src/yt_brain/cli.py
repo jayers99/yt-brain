@@ -561,6 +561,106 @@ def embed(
     console.print(f"[green]Embedded {embedded} videos. Total embeddings: {total}[/green]")
 
 
+# --- Cluster commands ---
+cluster_app = typer.Typer(help="Manage video topic clusters.")
+app.add_typer(cluster_app, name="cluster")
+
+
+@cluster_app.callback(invoke_without_command=True)
+def cluster_default(
+    ctx: typer.Context,
+    rebuild: Annotated[bool, typer.Option("--rebuild", help="Full recluster from scratch")] = False,
+    min_cluster_size: Annotated[int, typer.Option("--min-cluster-size", help="Minimum videos per cluster")] = 5,
+) -> None:
+    """Run video clustering (incremental by default, --rebuild for full)."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    from yt_brain.infrastructure.config import load_config
+    from yt_brain.infrastructure.database import get_embedding_count
+
+    db_path = _get_db_path()
+    _ensure_db(db_path)
+
+    emb_count = get_embedding_count(db_path)
+    if emb_count == 0:
+        console.print("[red]No embeddings found. Run: yt-brain embed[/red]")
+        raise typer.Exit(1)
+
+    if emb_count < 10:
+        console.print("[red]Not enough videos to cluster (need at least 10 embeddings).[/red]")
+        raise typer.Exit(1)
+
+    config = load_config()
+    api_key = getattr(config, "anthropic_api_key", "") or ""
+
+    if rebuild:
+        if not api_key:
+            console.print("[yellow]No anthropic_api_key in config. Slugs will be numeric.[/yellow]")
+            api_key = ""
+
+        console.print(f"[dim]Clustering {emb_count} videos (min_cluster_size={min_cluster_size})...[/dim]")
+
+        def on_progress(done: int, total: int) -> None:
+            console.print(f"  [dim]Named {done}/{total} clusters[/dim]")
+
+        from yt_brain.application.cluster import cluster_videos
+
+        n = cluster_videos(db_path, api_key=api_key, min_cluster_size=min_cluster_size, on_progress=on_progress)
+        console.print(f"[green]Created {n} clusters.[/green]")
+    else:
+        from yt_brain.application.cluster import assign_new_videos
+        from yt_brain.infrastructure.database import get_clusters_with_counts
+
+        clusters = get_clusters_with_counts(db_path)
+        if not clusters:
+            console.print("[yellow]No clusters exist yet. Run with --rebuild first.[/yellow]")
+            raise typer.Exit(1)
+
+        n = assign_new_videos(db_path)
+        console.print(f"[green]Assigned {n} new videos to existing clusters.[/green]")
+
+
+@cluster_app.command("list")
+def cluster_list() -> None:
+    """Show all clusters with video counts."""
+    from yt_brain.infrastructure.database import get_clusters_with_counts
+
+    db_path = _get_db_path()
+    _ensure_db(db_path)
+
+    clusters = get_clusters_with_counts(db_path)
+    if not clusters:
+        console.print("[dim]No clusters yet. Run: yt-brain cluster --rebuild[/dim]")
+        return
+
+    from rich.table import Table
+
+    table = Table(title="Video Clusters")
+    table.add_column("Slug", style="cyan")
+    table.add_column("Videos", justify="right")
+    for c in clusters:
+        table.add_row(c["slug"], str(c["count"]))
+    console.print(table)
+
+
+@cluster_app.command("rename")
+def cluster_rename(
+    old_slug: Annotated[str, typer.Argument(help="Current cluster slug")],
+    new_slug: Annotated[str, typer.Argument(help="New cluster slug")],
+) -> None:
+    """Rename a cluster slug."""
+    from yt_brain.infrastructure.database import rename_cluster
+
+    db_path = _get_db_path()
+    _ensure_db(db_path)
+
+    if rename_cluster(db_path, old_slug, new_slug):
+        console.print(f"[green]Renamed '{old_slug}' → '{new_slug}'[/green]")
+    else:
+        console.print(f"[red]Cluster '{old_slug}' not found.[/red]")
+
+
 @app.command("backfill-descriptions")
 def backfill_descriptions(
     limit: Annotated[int | None, typer.Option("--limit", "-n", help="Max videos to backfill")] = None,
