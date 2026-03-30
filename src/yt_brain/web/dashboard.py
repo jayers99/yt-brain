@@ -687,6 +687,7 @@ TEMPLATE = """
             document.getElementById('topicGrid').style.display = 'grid';
             document.getElementById('topicExpanded').style.display = 'none';
             document.getElementById('topicBreadcrumb').style.display = 'none';
+            document.getElementById('topicGridTitle').style.display = '';
             document.getElementById('topicGridTitle').textContent = 'Browse by Topic Clusters';
             activeClusterFilter = null;
             activeParentFilter = null;
@@ -722,7 +723,7 @@ TEMPLATE = """
             document.getElementById('topicGrid').style.display = 'none';
             document.getElementById('topicExpanded').style.display = 'block';
             document.getElementById('topicBreadcrumb').style.display = 'block';
-            document.getElementById('topicGridTitle').textContent = cat;
+            document.getElementById('topicGridTitle').style.display = 'none';
             _makeBreadcrumbParent(cat);
             document.getElementById('breadcrumbChild').innerHTML = '';
 
