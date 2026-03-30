@@ -582,7 +582,7 @@ TEMPLATE = """
             <h2 id="topicGridTitle">Browse by Topic Clusters</h2>
             <div id="topicGrid" class="topic-grid">
                 {% for cat, data in topic_grid %}
-                <div class="topic-card" data-category="{{ cat }}">
+                <div class="topic-card" data-category="{{ cat }}" onclick="expandCategory(this.dataset.category)">
                     <div class="topic-card-name">{{ cat }}</div>
                     <div class="topic-card-meta">{{ data.total }} videos &middot; {{ data.clusters|length }} clusters</div>
                     <div class="topic-card-preview">{{ data.clusters[:3]|map(attribute='slug')|join(', ') }}{% if data.clusters|length > 3 %}, ...{% endif %}</div>
