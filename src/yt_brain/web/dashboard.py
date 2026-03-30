@@ -362,7 +362,6 @@ TEMPLATE = """
         .topic-card-meta {
             font-size: 11px;
             color: var(--text-tertiary);
-            margin-bottom: 6px;
         }
         .topic-card-preview {
             font-size: 11px;
