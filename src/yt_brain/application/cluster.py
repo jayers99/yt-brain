@@ -148,10 +148,12 @@ def _generate_parent_categories(slugs: list[str], api_key: str) -> dict[str, str
             max_tokens=2048,
             system=(
                 "You are a categorization assistant. You receive a list of topic cluster slugs "
-                "and must group them into broad parent categories (10-15 total across all batches). "
+                "and must group them into 10-12 broad parent categories (total across all batches). "
+                "Use single-word or two-word category names. No ampersands, no special characters. "
                 "Respond with ONLY valid JSON (no markdown fences): an object where keys are "
-                "slug strings and values are short parent category names (2-3 words, Title Case). "
-                "Example: {\"film-photography\": \"Photography\", \"claude-code-workflows\": \"Tech & Dev\"}"
+                "slug strings and values are short parent category names (1-2 words, Title Case). "
+                "Example: {\"film-photography\": \"Photography\", \"claude-code-workflows\": \"Technology\", "
+                "\"coffee-tasting\": \"Food\", \"police-encounters\": \"Crime\"}"
             ),
             messages=[{
                 "role": "user",

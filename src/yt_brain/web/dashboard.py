@@ -579,10 +579,10 @@ TEMPLATE = """
                 <span id="breadcrumbParent"></span>
                 <span id="breadcrumbChild"></span>
             </div>
-            <h2 id="topicGridTitle">Browse by Topic</h2>
+            <h2 id="topicGridTitle">Browse by Topic Clusters</h2>
             <div id="topicGrid" class="topic-grid">
                 {% for cat, data in topic_grid %}
-                <div class="topic-card" onclick="expandCategory('{{ cat }}')" data-category="{{ cat }}">
+                <div class="topic-card" data-category="{{ cat }}">
                     <div class="topic-card-name">{{ cat }}</div>
                     <div class="topic-card-meta">{{ data.total }} videos &middot; {{ data.clusters|length }} clusters</div>
                     <div class="topic-card-preview">{{ data.clusters[:3]|map(attribute='slug')|join(', ') }}{% if data.clusters|length > 3 %}, ...{% endif %}</div>
@@ -674,11 +674,20 @@ TEMPLATE = """
         // Topic Grid data and navigation
         const topicGridData = {{ topic_grid_json | safe }};
 
+        // Event delegation for topic card clicks
+        const topicGridEl = document.getElementById('topicGrid');
+        if (topicGridEl) {
+            topicGridEl.addEventListener('click', function(e) {
+                const card = e.target.closest('.topic-card');
+                if (card) expandCategory(card.dataset.category);
+            });
+        }
+
         function topicGridReset() {
             document.getElementById('topicGrid').style.display = 'grid';
             document.getElementById('topicExpanded').style.display = 'none';
             document.getElementById('topicBreadcrumb').style.display = 'none';
-            document.getElementById('topicGridTitle').textContent = 'Browse by Topic';
+            document.getElementById('topicGridTitle').textContent = 'Browse by Topic Clusters';
             activeClusterFilter = null;
             activeParentFilter = null;
             semanticSearchEl.value = '';
