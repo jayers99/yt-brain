@@ -668,9 +668,24 @@ TEMPLATE = """
         let semanticTimer = null;
         let activeClusterFilter = null;
         let activeParentFilter = null;
+        let expandedCategory = null;  // currently expanded parent in topic grid
 
         // Topic Grid data and navigation
         const topicGridData = {{ topic_grid_json | safe }};
+
+        // Reverse map: cluster slug → parent category
+        const slugToCategory = {};
+        for (const [cat, data] of Object.entries(topicGridData)) {
+            for (const c of data.clusters) {
+                slugToCategory[c.slug] = cat;
+            }
+        }
+
+        // Cache topic card elements by category
+        const topicCards = {};
+        document.querySelectorAll('.topic-card[data-category]').forEach(card => {
+            topicCards[card.dataset.category] = card;
+        });
 
         // Event delegation for topic card clicks
         const topicGridEl = document.getElementById('topicGrid');
@@ -682,6 +697,7 @@ TEMPLATE = """
         }
 
         function topicGridReset() {
+            expandedCategory = null;
             document.getElementById('topicGrid').style.display = 'grid';
             document.getElementById('topicExpanded').style.display = 'none';
             document.getElementById('topicBreadcrumb').style.display = 'none';
@@ -718,6 +734,7 @@ TEMPLATE = """
             const data = topicGridData[cat];
             if (!data) return;
 
+            expandedCategory = cat;
             document.getElementById('topicGrid').style.display = 'none';
             document.getElementById('topicExpanded').style.display = 'block';
             document.getElementById('topicBreadcrumb').style.display = 'block';
@@ -725,26 +742,36 @@ TEMPLATE = """
             _makeBreadcrumbParent(cat);
             document.getElementById('breadcrumbChild').innerHTML = '';
 
-            const list = document.getElementById('topicExpandedList');
-            list.innerHTML = '';
-            data.clusters.forEach(function(c) {
-                const a = document.createElement('a');
-                a.href = '#';
-                a.innerHTML = c.slug + ' <span style="color:var(--text-tertiary)">(' + c.count + ')</span>';
-                a.addEventListener('click', function(e) { e.preventDefault(); selectChildCluster(cat, c.slug); });
-                list.appendChild(a);
-            });
-
-            const showAll = document.getElementById('topicShowAll');
-            showAll.textContent = 'Show all ' + data.total + ' ' + cat + ' videos';
-            showAll.onclick = function() { showParentVideos(cat); return false; };
-
             // Don't filter yet - just show the expanded view
             activeClusterFilter = null;
             activeParentFilter = null;
             semanticSearchEl.value = '';
             semanticMatchIds = null;
-            applyFilters();
+            applyFilters();  // will call renderExpandedClusters via topic grid update
+        }
+
+        // Render child cluster pills using filtered counts
+        function renderExpandedClusters(cat, clusterVideoCounts) {
+            const data = topicGridData[cat];
+            if (!data) return;
+
+            const list = document.getElementById('topicExpandedList');
+            list.innerHTML = '';
+            let catTotal = 0;
+            data.clusters.forEach(function(c) {
+                const cnt = clusterVideoCounts[c.slug] || 0;
+                if (cnt === 0) return;  // hide clusters with 0 matching videos
+                catTotal += cnt;
+                const a = document.createElement('a');
+                a.href = '#';
+                a.innerHTML = c.slug + ' <span style="color:var(--text-tertiary)">(' + cnt + ')</span>';
+                a.addEventListener('click', function(e) { e.preventDefault(); selectChildCluster(cat, c.slug); });
+                list.appendChild(a);
+            });
+
+            const showAll = document.getElementById('topicShowAll');
+            showAll.textContent = 'Show all ' + catTotal + ' ' + cat + ' videos';
+            showAll.onclick = function() { showParentVideos(cat); return false; };
         }
 
         function showParentVideos(cat) {
@@ -987,6 +1014,45 @@ TEMPLATE = """
                     const eName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                     return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">&#9733;</span></td><td><a href="${url}" target="_blank" class="link-title">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar-track"><div class="bar" style="width:${pct}%"></div></div><span class="bar-label">${pct}%</span></div></td></tr>`;
                 }).join('');
+            }
+
+            // Update topic grid counts based on filtered videos
+            if (topicGridEl) {
+                // Count videos per cluster that pass non-cluster filters (genre + date + star + search)
+                const clusterVideoCounts = {};
+                for (let i = 0, len = videoData.length; i < len; i++) {
+                    const v = videoData[i];
+                    if (!v.cluster) continue;
+                    const dateOk2 = cutoffTs === null || (v.watchedTs !== null && v.watchedTs >= cutoffTs);
+                    const starOk2 = !starFilterActive || starredChannels.has(v.channel);
+                    const genreOk2 = selectedGenres.has(v.genre);
+                    if (dateOk2 && starOk2 && genreOk2) {
+                        clusterVideoCounts[v.cluster] = (clusterVideoCounts[v.cluster] || 0) + 1;
+                    }
+                }
+
+                // Aggregate by parent category
+                for (const [cat, card] of Object.entries(topicCards)) {
+                    const data = topicGridData[cat];
+                    if (!data) continue;
+                    let catTotal = 0;
+                    let catClusters = 0;
+                    for (const c of data.clusters) {
+                        const cnt = clusterVideoCounts[c.slug] || 0;
+                        if (cnt > 0) catClusters++;
+                        catTotal += cnt;
+                    }
+                    const meta = card.querySelector('.topic-card-meta');
+                    if (meta) {
+                        meta.textContent = catTotal + ' videos \u00b7 ' + catClusters + ' clusters';
+                    }
+                    card.style.display = catTotal > 0 ? '' : 'none';
+                }
+
+                // Update expanded child cluster pills if a category is open
+                if (expandedCategory) {
+                    renderExpandedClusters(expandedCategory, clusterVideoCounts);
+                }
             }
         }
     </script>

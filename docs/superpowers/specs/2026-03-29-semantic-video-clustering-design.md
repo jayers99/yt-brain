@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-29
 **Backlog item:** #2 `embed-and-cluster`
-**Status:** Approved
+**Status:** Complete
 
 ## Purpose
 
