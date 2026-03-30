@@ -357,7 +357,7 @@ TEMPLATE = """
             font-weight: 600;
             font-size: 14px;
             color: var(--text-primary);
-            margin-bottom: 4px;
+            margin-bottom: 5px;
         }
         .topic-card-meta {
             font-size: 11px;
