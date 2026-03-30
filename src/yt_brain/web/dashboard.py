@@ -335,7 +335,7 @@ TEMPLATE = """
             text-decoration: none;
         }
         .topic-breadcrumb a:hover { text-decoration: underline; }
-        .topic-breadcrumb span::before { content: ' \203A '; color: var(--text-tertiary); }
+        .topic-breadcrumb span::before { content: ' \\203A '; color: var(--text-tertiary); }
         .topic-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
