@@ -585,7 +585,6 @@ TEMPLATE = """
                 <div class="topic-card" data-category="{{ cat }}">
                     <div class="topic-card-name">{{ cat }}</div>
                     <div class="topic-card-meta">{{ data.total }} videos &middot; {{ data.clusters|length }} clusters</div>
-                    <div class="topic-card-preview">{{ data.clusters[:3]|map(attribute='slug')|join(', ') }}{% if data.clusters|length > 3 %}, ...{% endif %}</div>
                 </div>
                 {% endfor %}
             </div>
