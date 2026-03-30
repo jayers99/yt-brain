@@ -582,7 +582,7 @@ TEMPLATE = """
             <h2 id="topicGridTitle">Browse by Topic Clusters</h2>
             <div id="topicGrid" class="topic-grid">
                 {% for cat, data in topic_grid %}
-                <div class="topic-card" data-category="{{ cat }}" onclick="expandCategory(this.dataset.category)">
+                <div class="topic-card" data-category="{{ cat }}">
                     <div class="topic-card-name">{{ cat }}</div>
                     <div class="topic-card-meta">{{ data.total }} videos &middot; {{ data.clusters|length }} clusters</div>
                     <div class="topic-card-preview">{{ data.clusters[:3]|map(attribute='slug')|join(', ') }}{% if data.clusters|length > 3 %}, ...{% endif %}</div>
@@ -695,6 +695,26 @@ TEMPLATE = """
             applyFilters();
         }
 
+        function _makeBreadcrumbParent(cat) {
+            const a = document.createElement('a');
+            a.href = '#';
+            a.textContent = cat;
+            a.addEventListener('click', function(e) { e.preventDefault(); expandCategory(cat); });
+            const span = document.getElementById('breadcrumbParent');
+            span.innerHTML = '';
+            span.appendChild(a);
+        }
+
+        function _makeBreadcrumbParentForFilter(cat) {
+            const a = document.createElement('a');
+            a.href = '#';
+            a.textContent = cat;
+            a.addEventListener('click', function(e) { e.preventDefault(); expandCategory(cat); });
+            const span = document.getElementById('breadcrumbParent');
+            span.innerHTML = '';
+            span.appendChild(a);
+        }
+
         function expandCategory(cat) {
             const data = topicGridData[cat];
             if (!data) return;
@@ -703,15 +723,18 @@ TEMPLATE = """
             document.getElementById('topicExpanded').style.display = 'block';
             document.getElementById('topicBreadcrumb').style.display = 'block';
             document.getElementById('topicGridTitle').textContent = cat;
-            document.getElementById('breadcrumbParent').innerHTML =
-                '<a href="#" onclick="showParentVideos(\'' + cat.replace(/'/g, "\\'") + '\'); return false;">' + cat + '</a>';
+            _makeBreadcrumbParent(cat);
             document.getElementById('breadcrumbChild').innerHTML = '';
 
             const list = document.getElementById('topicExpandedList');
-            list.innerHTML = data.clusters.map(c =>
-                '<a href="#" onclick="selectChildCluster(\'' + cat.replace(/'/g, "\\'") + '\', \'' + c.slug + '\'); return false;">' +
-                c.slug + ' <span style="color:var(--text-tertiary)">(' + c.count + ')</span></a>'
-            ).join('');
+            list.innerHTML = '';
+            data.clusters.forEach(function(c) {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.innerHTML = c.slug + ' <span style="color:var(--text-tertiary)">(' + c.count + ')</span>';
+                a.addEventListener('click', function(e) { e.preventDefault(); selectChildCluster(cat, c.slug); });
+                list.appendChild(a);
+            });
 
             const showAll = document.getElementById('topicShowAll');
             showAll.textContent = 'Show all ' + data.total + ' ' + cat + ' videos';
@@ -730,8 +753,7 @@ TEMPLATE = """
             if (!data) return;
 
             document.getElementById('topicBreadcrumb').style.display = 'block';
-            document.getElementById('breadcrumbParent').innerHTML =
-                '<a href="#" onclick="expandCategory(\'' + cat.replace(/'/g, "\\'") + '\'); return false;">' + cat + '</a>';
+            _makeBreadcrumbParentForFilter(cat);
             document.getElementById('breadcrumbChild').innerHTML = '';
 
             // Filter to all clusters in this category
@@ -745,10 +767,13 @@ TEMPLATE = """
 
         function selectChildCluster(cat, slug) {
             document.getElementById('topicBreadcrumb').style.display = 'block';
-            document.getElementById('breadcrumbParent').innerHTML =
-                '<a href="#" onclick="expandCategory(\'' + cat.replace(/'/g, "\\'") + '\'); return false;">' + cat + '</a>';
-            document.getElementById('breadcrumbChild').innerHTML =
-                '<span style="color:var(--text-primary)">' + slug + '</span>';
+            _makeBreadcrumbParent(cat);
+            const childSpan = document.getElementById('breadcrumbChild');
+            childSpan.innerHTML = '';
+            const s = document.createElement('span');
+            s.style.color = 'var(--text-primary)';
+            s.textContent = slug;
+            childSpan.appendChild(s);
 
             activeClusterFilter = slug;
             activeParentFilter = null;
