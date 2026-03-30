@@ -1033,6 +1033,10 @@ def create_app() -> Flask:
         clusters_raw = get_clusters_by_category(config.db_path)
         topic_grid = {}
         for c in clusters_raw:
+            # Skip numeric fallback clusters (cluster-01, cluster-02, etc.)
+            import re as _re
+            if _re.match(r"^cluster-\d+$", c["slug"]):
+                continue
             cat = c["parent_category"]
             if cat not in topic_grid:
                 topic_grid[cat] = {"clusters": [], "total": 0}
