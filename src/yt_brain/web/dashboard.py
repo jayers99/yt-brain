@@ -953,11 +953,11 @@ TEMPLATE = """
                 videoData.sort((a, b) => a.originalIndex - b.originalIndex);
             }
 
+            // Re-append rows in sorted order; each row retains its display state
+            // so we don't need to re-run applyFilters (the expensive part).
             const frag = document.createDocumentFragment();
             for (const v of videoData) frag.appendChild(v.row);
             tbody.appendChild(frag);
-
-            applyFilters();
         }
 
         function toggleLikedFilter() {
