@@ -5,7 +5,10 @@ import urllib.request
 from pathlib import Path
 from urllib.error import URLError
 
+from yt_brain.infrastructure.ytdlp_adapter import fetch_liked_ids
 from yt_brain.infrastructure.database import (
+    bulk_update_liked,
+    get_all_video_ids,
     get_videos_missing_category,
     get_videos_missing_channel,
     get_videos_missing_description,
@@ -122,6 +125,22 @@ def backfill_descriptions(
         if on_progress:
             on_progress(min(i + 50, total), total)
     return filled
+
+
+def backfill_likes(db_path: Path, browser: str = "chrome") -> int:
+    """Fetch liked video IDs via yt-dlp and mark them in the database.
+
+    Returns the number of videos marked as liked.
+    """
+    liked_ids = set(fetch_liked_ids(browser=browser))
+    all_ids = get_all_video_ids(db_path)
+    matched = liked_ids & all_ids
+
+    if matched:
+        liked_map = {vid: "like" for vid in matched}
+        bulk_update_liked(db_path, liked_map)
+
+    return len(matched)
 
 
 def backfill_dates(db_path: Path, api_key: str, video_ids: list[str] | None = None) -> int:

@@ -51,3 +51,26 @@ def test_fetch_liked_ids(temp_db):
         ids = fetch_liked_ids(browser="chrome")
 
     assert ids == ["abc123", "def456", "ghi789"]
+
+
+def test_backfill_likes_marks_liked_videos(temp_db):
+    from yt_brain.application.backfill import backfill_likes
+    from yt_brain.infrastructure.database import save_video
+
+    # Create 3 videos in DB
+    for vid_id in ["vid1", "vid2", "vid3"]:
+        save_video(temp_db, Video(youtube_id=vid_id, title=f"V {vid_id}", channel_id="ch"))
+
+    # yt-dlp says vid1 and vid3 are liked
+    with patch("yt_brain.application.backfill.fetch_liked_ids", return_value=["vid1", "vid3", "vid_not_in_db"]):
+        count = backfill_likes(temp_db, browser="chrome")
+
+    assert count == 2
+
+    import sqlite3
+    conn = sqlite3.connect(temp_db)
+    rows = {r[0]: r[1] for r in conn.execute("SELECT youtube_id, liked FROM videos WHERE youtube_id IN ('vid1','vid2','vid3')").fetchall()}
+    conn.close()
+    assert rows["vid1"] == "like"
+    assert rows["vid2"] is None
+    assert rows["vid3"] == "like"
