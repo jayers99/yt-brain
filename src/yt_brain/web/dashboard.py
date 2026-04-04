@@ -22,6 +22,16 @@ from yt_brain.infrastructure.database import (
 
 from .classifier import classify_genre, genre_stats
 
+
+def is_removed_video(video: "Video") -> bool:
+    """Return True if the video was removed/private on YouTube.
+
+    Detected by Takeout storing the raw URL as the title when YouTube
+    can't resolve the actual video title.
+    """
+    return video.title.startswith("https://www.youtube.com/watch?v=")
+
+
 TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -1286,6 +1296,8 @@ def create_app() -> Flask:
         config = load_config()
         init_db(config.db_path)
         videos_raw = get_all_videos(config.db_path)
+        # Exclude removed/private videos (title is the raw YouTube URL)
+        videos_raw = [v for v in videos_raw if not is_removed_video(v)]
         channel_urls = get_channel_urls(config.db_path)
 
         # Load cluster slugs for all videos
