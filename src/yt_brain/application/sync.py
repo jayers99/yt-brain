@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from yt_brain.application.backfill import backfill_categories, backfill_channels, backfill_dates
-from yt_brain.infrastructure.database import get_existing_video_ids, save_video, update_watched_at
+from yt_brain.infrastructure.database import get_existing_video_ids, get_existing_video_watched_at, save_video, update_watched_at
 from yt_brain.infrastructure.ytdlp_adapter import fetch_history_range, parse_ytdlp_metadata
 
 
@@ -48,16 +48,20 @@ def sync_videos(
         existing = get_existing_video_ids(db_path, batch_ids)
         new_ids = [vid for vid in batch_ids if vid not in existing]
 
-        # Update watched_at for re-watched videos in the first batch.
-        # History is ordered most-recent-first, so existing videos near
-        # the top have been re-watched and need their timestamp updated.
-        # Assign decreasing timestamps (1 second apart) to preserve order.
+        # Update watched_at only for videos genuinely re-watched since
+        # the last sync.  A video counts as re-watched if its stored
+        # watched_at is more than 24 hours old — recent timestamps are
+        # just artifacts of the previous sync run.
         if start == 1:
+            existing_timestamps = get_existing_video_watched_at(db_path, batch_ids)
+            cutoff = (now - timedelta(hours=24)).isoformat()
             for i, vid_id in enumerate(batch_ids):
-                if vid_id in existing:
-                    ts = (now - timedelta(seconds=i)).isoformat()
-                    update_watched_at(db_path, vid_id, ts)
-                    rewatched_ids.append(vid_id)
+                if vid_id in existing_timestamps:
+                    old_ts = existing_timestamps[vid_id]
+                    if old_ts is None or old_ts < cutoff:
+                        ts = (now - timedelta(seconds=i)).isoformat()
+                        update_watched_at(db_path, vid_id, ts)
+                        rewatched_ids.append(vid_id)
 
         if not new_ids:
             # Entire batch already known — stop

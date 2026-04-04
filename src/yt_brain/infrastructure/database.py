@@ -226,6 +226,22 @@ def update_category(db_path: Path, youtube_id: str, category: str) -> None:
         conn.close()
 
 
+def get_existing_video_watched_at(db_path: Path, youtube_ids: list[str]) -> dict[str, str | None]:
+    """Return {youtube_id: watched_at} for videos that exist in the database."""
+    if not youtube_ids:
+        return {}
+    conn = sqlite3.connect(db_path)
+    try:
+        placeholders = ",".join("?" * len(youtube_ids))
+        cursor = conn.execute(
+            f"SELECT youtube_id, watched_at FROM videos WHERE youtube_id IN ({placeholders})",
+            youtube_ids,
+        )
+        return {row[0]: row[1] for row in cursor.fetchall()}
+    finally:
+        conn.close()
+
+
 def get_existing_video_ids(db_path: Path, youtube_ids: list[str]) -> set[str]:
     """Return the subset of youtube_ids that already exist in the database."""
     if not youtube_ids:

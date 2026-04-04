@@ -29,6 +29,10 @@ TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>yt-brain Dashboard</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -578,7 +582,7 @@ TEMPLATE = """
                 <span id="breadcrumbParent"></span>
                 <span id="breadcrumbChild"></span>
             </div>
-            <h2 id="topicGridTitle">Browse by Topic Clusters</h2>
+            <h2 id="topicGridTitle">Browse by Topic Clusters <span style="font-size:0.9em; font-weight:normal; opacity:0.7">({{ clustered_pct }}% of videos clustered)</span></h2>
             <div id="topicGrid" class="topic-grid">
                 {% for cat, data in topic_grid %}
                 <div class="topic-card" data-category="{{ cat }}">
@@ -1189,6 +1193,8 @@ def create_app() -> Flask:
             duration_buckets.append({"label": label, "count": count})
 
         has_embeddings = get_embedding_count(config.db_path) > 0
+        clustered_count = sum(1 for v in videos if v["cluster"])
+        clustered_pct = round(clustered_count / total * 100) if total else 0
 
         return render_template_string(
             TEMPLATE,
@@ -1208,6 +1214,7 @@ def create_app() -> Flask:
             starred_json=json.dumps(list(starred)),
             channel_urls_json=json.dumps(channel_urls),
             has_embeddings=has_embeddings,
+            clustered_pct=clustered_pct,
             topic_grid=topic_grid_sorted,
             topic_grid_json=json.dumps(
                 {cat: {"clusters": data["clusters"], "total": data["total"]}

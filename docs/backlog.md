@@ -24,3 +24,7 @@
 | 20 | `queue-engine` | Curated learning queue synced to a YouTube playlist for cross-device playback | Backlog |
 | 21 | `guilty-pleasure-budget` | Weekly brain rot allowance with real-time balance tracking and overdraft penalties | Backlog |
 | 22 | `public-release` | Package yt-brain for non-technical users: installation, API key problem, hosted options | Backlog |
+| 23 | `watch-timeline` | Bar chart of videos watched over time; x-axis adapts to active date filter (day/week/month/all-time) with appropriate bucket widths | Backlog |
+| 24 | `genre-timeline` | Multi-line time series layered on watch-timeline with one line per genre; visualize binge patterns across categories (entertainment vs education vs etc.) | Backlog |
+| 25 | `favicon-optimize` | Redesign favicons for legibility at small sizes (16x16, 32x32); simplify detail for browser tabs | Backlog |
+| 26 | `short-query-search` | Improve search for short queries (2-3 chars like "4K"); explore hybrid approach — substring/LIKE match for short input, semantic for longer; longer debounce on short queries to avoid wasted API calls | Backlog |
