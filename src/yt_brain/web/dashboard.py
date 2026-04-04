@@ -303,6 +303,61 @@ TEMPLATE = """
         #videoTable td a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #videoTable thead tr:first-child th { position: sticky; top: 0; background: var(--bg-surface); z-index: 2; }
         #videoTable thead tr:last-child th { position: sticky; top: 45px; background: var(--bg-surface); z-index: 1; }
+        /* Sortable headers */
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        .sortable:hover {
+            color: var(--text-primary);
+        }
+        .sortable::after {
+            content: '';
+            margin-left: 4px;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+        .sortable.sort-asc::after {
+            content: '▲';
+            color: var(--accent);
+        }
+        .sortable.sort-desc::after {
+            content: '▼';
+            color: var(--accent);
+        }
+        /* Liked column */
+        .liked-cell {
+            text-align: center;
+            font-size: 14px;
+        }
+        .liked-icon {
+            opacity: 0.3;
+        }
+        .liked-icon.liked {
+            opacity: 1;
+        }
+        .liked-icon.disliked {
+            opacity: 1;
+        }
+        .liked-btn {
+            cursor: pointer;
+            opacity: 0.3;
+            font-size: 14px;
+            user-select: none;
+        }
+        .liked-btn.filter-like {
+            opacity: 1;
+        }
+        .liked-btn.filter-dislike {
+            opacity: 1;
+        }
+        /* Date columns */
+        .date-cell {
+            font-variant-numeric: tabular-nums;
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
         #genreTable td, #genreTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #genreTable thead th { position: sticky; top: 0; background: var(--bg-surface); z-index: 1; }
         #channelTable td, #channelTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -603,24 +658,38 @@ TEMPLATE = """
             <div class="video-list">
                 <table id="videoTable">
                     <colgroup>
-                        <col style="width:45%">
-                        <col style="width:20%">
-                        <col style="width:20%">
-                        <col style="width:15%">
+                        <col style="width:4%">
+                        <col style="width:33%">
+                        <col style="width:16%">
+                        <col style="width:14%">
+                        <col style="width:13%">
+                        <col style="width:10%">
+                        <col style="width:10%">
                     </colgroup>
                     <thead>
                         <tr>
-                            <th colspan="4" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
+                            <th colspan="7" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
                         </tr>
-                        <tr><th>Title</th><th>Channel</th><th>Genre</th><th>Cluster</th></tr>
+                        <tr>
+                            <th><span id="likedFilter" class="liked-btn" onclick="toggleLikedFilter()" title="Filter by liked status">&#x1F44D;</span></th>
+                            <th class="sortable" data-sort="title" onclick="toggleSort('title')">Title</th>
+                            <th class="sortable" data-sort="channel" onclick="toggleSort('channel')">Channel</th>
+                            <th class="sortable" data-sort="genre" onclick="toggleSort('genre')">Genre</th>
+                            <th class="sortable" data-sort="cluster" onclick="toggleSort('cluster')">Cluster</th>
+                            <th class="sortable" data-sort="watched" onclick="toggleSort('watched')">Watched</th>
+                            <th class="sortable" data-sort="published" onclick="toggleSort('published')">Published</th>
+                        </tr>
                     </thead>
                     <tbody>
                     {% for v in videos %}
-                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}" data-cluster="{{ v.cluster }}">
+                    <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}" data-cluster="{{ v.cluster }}" data-liked="{{ v.liked }}" data-published="{{ v.published_at }}">
+                        <td class="liked-cell">{% if v.liked == 'like' %}<span class="liked-icon liked">&#x1F44D;</span>{% elif v.liked == 'dislike' %}<span class="liked-icon disliked">&#x1F44E;</span>{% endif %}</td>
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title }}</a></td>
                         <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
                         <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
                         <td>{% if v.cluster %}<a href="#" class="link-cluster" onclick="filterByCluster('{{ v.cluster }}'); return false;">{{ v.cluster }}</a>{% endif %}</td>
+                        <td class="date-cell">{{ v.watched_at[:10] if v.watched_at else '' }}</td>
+                        <td class="date-cell">{{ v.published_at[:10] if v.published_at else '' }}</td>
                     </tr>
                     {% endfor %}
                     </tbody>
@@ -642,18 +711,26 @@ TEMPLATE = """
         const channelUrls = {{ channel_urls_json | safe }};
 
         let starFilterActive = false;
+        let sortColumn = null;
+        let sortDirection = null;
+        let likedFilterState = null;
 
         // Pre-cache video data from DOM once — avoids DOM reads in filter loop
         const videoRows = document.querySelectorAll('#videoTable tbody tr');
-        const videoData = Array.from(videoRows).map(row => ({
+        const videoData = Array.from(videoRows).map((row, idx) => ({
             row,
+            originalIndex: idx,
             id: row.dataset.id,
             genre: row.dataset.genre,
             cluster: row.dataset.cluster || '',
+            liked: row.dataset.liked || '',
             watchedTs: row.dataset.watched ? new Date(row.dataset.watched).getTime() : null,
-            title: (row.children[0]?.textContent || '').toLowerCase(),
-            channel: row.children[1]?.textContent || '',
-            channelLower: (row.children[1]?.textContent || '').toLowerCase(),
+            watched: row.dataset.watched || '',
+            published: row.dataset.published || '',
+            publishedTs: row.dataset.published ? new Date(row.dataset.published).getTime() : null,
+            title: (row.children[1]?.textContent || '').toLowerCase(),
+            channel: row.children[2]?.textContent || '',
+            channelLower: (row.children[2]?.textContent || '').toLowerCase(),
         }));
 
         // Cache DOM refs
@@ -828,6 +905,81 @@ TEMPLATE = """
             applyFilters();
         }
 
+        function toggleSort(column) {
+            if (sortColumn === column) {
+                if (sortDirection === 'asc') sortDirection = 'desc';
+                else if (sortDirection === 'desc') { sortDirection = null; sortColumn = null; }
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+
+            // Update header indicators
+            document.querySelectorAll('.sortable').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            if (sortColumn && sortDirection) {
+                const activeTh = document.querySelector(`.sortable[data-sort="${sortColumn}"]`);
+                if (activeTh) activeTh.classList.add('sort-' + sortDirection);
+            }
+
+            applySortAndFilters();
+        }
+
+        function applySortAndFilters() {
+            const tbody = document.querySelector('#videoTable tbody');
+
+            if (sortColumn && sortDirection) {
+                const dir = sortDirection === 'asc' ? 1 : -1;
+                videoData.sort((a, b) => {
+                    let va, vb;
+                    if (sortColumn === 'title') { va = a.title; vb = b.title; }
+                    else if (sortColumn === 'channel') { va = a.channelLower; vb = b.channelLower; }
+                    else if (sortColumn === 'genre') { va = a.genre.toLowerCase(); vb = b.genre.toLowerCase(); }
+                    else if (sortColumn === 'cluster') { va = a.cluster.toLowerCase(); vb = b.cluster.toLowerCase(); }
+                    else if (sortColumn === 'watched') { va = a.watched; vb = b.watched; }
+                    else if (sortColumn === 'published') { va = a.published; vb = b.published; }
+                    else return 0;
+
+                    // Empty values sort last regardless of direction
+                    if (!va && !vb) return 0;
+                    if (!va) return 1;
+                    if (!vb) return -1;
+                    if (va < vb) return -dir;
+                    if (va > vb) return dir;
+                    return 0;
+                });
+            } else {
+                videoData.sort((a, b) => a.originalIndex - b.originalIndex);
+            }
+
+            const frag = document.createDocumentFragment();
+            for (const v of videoData) frag.appendChild(v.row);
+            tbody.appendChild(frag);
+
+            applyFilters();
+        }
+
+        function toggleLikedFilter() {
+            const btn = document.getElementById('likedFilter');
+            if (likedFilterState === null) {
+                likedFilterState = 'like';
+                btn.classList.add('filter-like');
+                btn.classList.remove('filter-dislike');
+                btn.innerHTML = '&#x1F44D;';
+            } else if (likedFilterState === 'like') {
+                likedFilterState = 'dislike';
+                btn.classList.remove('filter-like');
+                btn.classList.add('filter-dislike');
+                btn.innerHTML = '&#x1F44E;';
+            } else {
+                likedFilterState = null;
+                btn.classList.remove('filter-like', 'filter-dislike');
+                btn.innerHTML = '&#x1F44D;';
+            }
+            applyFilters();
+        }
+
         function scheduleSemanticSearch() {
             if (semanticTimer) clearTimeout(semanticTimer);
             const q = semanticSearchEl.value.trim();
@@ -936,8 +1088,9 @@ TEMPLATE = """
                         ? activeParentFilter.has(v.cluster)
                         : (semanticMatchIds === null || semanticMatchIds.has(v.id));
                 const starOk = !starFilterActive || starredChannels.has(v.channel);
+                const likedOk = likedFilterState === null || v.liked === likedFilterState;
                 const genreOk = selectedGenres.has(v.genre);
-                const passesNonGenre = dateOk && searchOk && starOk;
+                const passesNonGenre = dateOk && searchOk && starOk && likedOk;
                 const visible = passesNonGenre && genreOk;
 
                 v.row.style.display = visible ? '' : 'none';
@@ -1098,6 +1251,15 @@ def create_app() -> Flask:
         from yt_brain.infrastructure.database import get_all_video_cluster_slugs, get_clusters_by_category
         cluster_slugs = get_all_video_cluster_slugs(config.db_path)
 
+        # Load liked status and published dates
+        import sqlite3 as _sqlite3
+        _conn = _sqlite3.connect(config.db_path)
+        try:
+            _liked_map = {r[0]: r[1] for r in _conn.execute("SELECT youtube_id, liked FROM videos WHERE liked IS NOT NULL").fetchall()}
+            _published_map = {r[0]: r[1] for r in _conn.execute("SELECT youtube_id, published_at FROM videos WHERE published_at IS NOT NULL").fetchall()}
+        finally:
+            _conn.close()
+
         # Build topic grid data: {category: [{slug, count}, ...]}
         clusters_raw = get_clusters_by_category(config.db_path)
         topic_grid = {}
@@ -1134,6 +1296,8 @@ def create_app() -> Flask:
                 "watched_at": v.watched_at.isoformat() if v.watched_at else "",
                 "channel_url": channel_urls.get(v.channel_id, ""),
                 "cluster": cluster_slugs.get(v.youtube_id, ""),
+                "liked": _liked_map.get(v.youtube_id, ""),
+                "published_at": _published_map.get(v.youtube_id, ""),
             })
 
         stats = genre_stats(videos)
