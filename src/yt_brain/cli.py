@@ -712,6 +712,25 @@ def backfill_channels() -> None:
     console.print(f"[green]Backfilled {filled}/{missing_count} channel names.[/green]")
 
 
+@app.command("backfill-likes")
+def backfill_likes_cmd(
+    browser: Annotated[str, typer.Option("--browser", "-b", help="Browser to read cookies from")] = "chrome",
+) -> None:
+    """Backfill liked video status from YouTube."""
+    from yt_brain.application.backfill import backfill_likes
+
+    db_path = _get_db_path()
+    _ensure_db(db_path)
+
+    console.print(f"[dim]Fetching liked videos from YouTube ({browser} cookies)...[/dim]")
+    try:
+        count = backfill_likes(db_path, browser=browser)
+    except Exception as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    console.print(f"[green]Marked {count} videos as liked.[/green]")
+
+
 @app.command()
 def dashboard(
     port: Annotated[int, typer.Option("--port", "-p", help="Port to serve on")] = 5555,
