@@ -201,6 +201,8 @@ def sync(
             console.print(f"  Categories backfilled: {result.categories_backfilled}")
         if result.dates_backfilled:
             console.print(f"  Dates backfilled: {result.dates_backfilled}")
+        if result.likes_synced:
+            console.print(f"  Likes synced: {result.likes_synced}")
 
 
 @app.command("backfill-categories")

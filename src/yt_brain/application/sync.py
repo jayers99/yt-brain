@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from yt_brain.application.backfill import backfill_categories, backfill_channels, backfill_dates
+from yt_brain.application.backfill import backfill_categories, backfill_channels, backfill_dates, backfill_likes
 from yt_brain.infrastructure.database import get_existing_video_ids, get_existing_video_watched_at, save_video, update_watched_at
 from yt_brain.infrastructure.ytdlp_adapter import fetch_history_range, parse_ytdlp_metadata
 
@@ -16,6 +16,7 @@ class SyncResult:
     channels_backfilled: int
     categories_backfilled: int
     dates_backfilled: int
+    likes_synced: int
 
 
 def sync_videos(
@@ -84,6 +85,7 @@ def sync_videos(
     channels_filled = backfill_channels(db_path, video_ids=all_new_ids) if all_new_ids else 0
     categories_filled = backfill_categories(db_path, api_key, video_ids=all_new_ids) if all_new_ids and api_key else 0
     dates_filled = backfill_dates(db_path, api_key, video_ids=all_new_ids) if all_new_ids and api_key else 0
+    likes_filled = backfill_likes(db_path, browser=browser)
 
     return SyncResult(
         new_videos=len(all_new_ids),
@@ -91,4 +93,5 @@ def sync_videos(
         channels_backfilled=channels_filled,
         categories_backfilled=categories_filled,
         dates_backfilled=dates_filled,
+        likes_synced=likes_filled,
     )

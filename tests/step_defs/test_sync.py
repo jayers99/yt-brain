@@ -123,3 +123,19 @@ def check_categories_backfilled(ctx):
 @then("dates are backfilled for new videos")
 def check_dates_backfilled(ctx):
     assert ctx.sync_result.dates_backfilled >= 0
+
+
+def test_sync_refreshes_liked_status(temp_db):
+    from yt_brain.application.sync import sync_videos
+
+    # Pre-populate a video
+    save_video(temp_db, Video(youtube_id="vid1", title="V1", channel_id="ch"))
+
+    entries = [{"id": "new1", "title": "New Video", "duration": 300}]
+
+    with patch("yt_brain.application.sync.fetch_history_range", return_value=entries), \
+         patch("yt_brain.application.sync.backfill_likes", return_value=1) as mock_likes:
+        result = sync_videos(temp_db, batch_size=10)
+        mock_likes.assert_called_once_with(temp_db, browser="chrome")
+
+    assert result.likes_synced == 1
