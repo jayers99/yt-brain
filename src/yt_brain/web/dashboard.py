@@ -953,11 +953,14 @@ TEMPLATE = """
                 videoData.sort((a, b) => a.originalIndex - b.originalIndex);
             }
 
-            // Re-append rows in sorted order; each row retains its display state
-            // so we don't need to re-run applyFilters (the expensive part).
+            // Detach tbody from DOM to avoid per-node reflow, reorder off-screen,
+            // then re-attach in one shot.
+            const table = tbody.parentNode;
+            table.removeChild(tbody);
             const frag = document.createDocumentFragment();
             for (const v of videoData) frag.appendChild(v.row);
             tbody.appendChild(frag);
+            table.appendChild(tbody);
         }
 
         function toggleLikedFilter() {
