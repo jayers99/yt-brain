@@ -1,0 +1,4 @@
+ALTER TABLE videos ADD COLUMN liked TEXT DEFAULT NULL;
+ALTER TABLE videos ADD COLUMN published_at TEXT DEFAULT NULL;
+
+INSERT INTO schema_version (version) VALUES (7);
