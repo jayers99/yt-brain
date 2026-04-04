@@ -16,6 +16,7 @@ from yt_brain.infrastructure.database import (
     update_category,
     update_channel_id,
     update_description,
+    update_published_at,
     update_watched_at,
 )
 
@@ -169,6 +170,7 @@ def backfill_dates(db_path: Path, api_key: str, video_ids: list[str] | None = No
                 published = item["snippet"].get("publishedAt", "")
                 if published:
                     update_watched_at(db_path, item["id"], published)
+                    update_published_at(db_path, item["id"], published)
                     filled += 1
         except (URLError, json.JSONDecodeError, KeyError):
             pass

@@ -74,3 +74,28 @@ def test_backfill_likes_marks_liked_videos(temp_db):
     assert rows["vid1"] == "like"
     assert rows["vid2"] is None
     assert rows["vid3"] == "like"
+
+
+def test_backfill_dates_populates_published_at(temp_db):
+    from yt_brain.application.backfill import backfill_dates
+    from yt_brain.infrastructure.database import save_video
+
+    v = Video(youtube_id="pub1", title="Pub Video", channel_id="ch")
+    save_video(temp_db, v)
+
+    import json
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps({
+        "items": [{"id": "pub1", "snippet": {"publishedAt": "2024-03-15T12:00:00Z"}}]
+    }).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = lambda s, *a: None
+
+    with patch("yt_brain.application.backfill.urllib.request.urlopen", return_value=mock_resp):
+        backfill_dates(temp_db, "test-key")
+
+    import sqlite3
+    conn = sqlite3.connect(temp_db)
+    row = conn.execute("SELECT published_at FROM videos WHERE youtube_id = 'pub1'").fetchone()
+    conn.close()
+    assert row[0] == "2024-03-15T12:00:00Z"
