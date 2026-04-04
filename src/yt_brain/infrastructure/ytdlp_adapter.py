@@ -131,6 +131,30 @@ def fetch_history_range(
     return entries
 
 
+def fetch_liked_ids(browser: str = "chrome") -> list[str]:
+    """Fetch video IDs from the user's Liked Videos playlist via yt-dlp."""
+    try:
+        result = subprocess.run(
+            [
+                "yt-dlp",
+                "--cookies-from-browser", browser,
+                "--flat-playlist",
+                "--print", "id",
+                "https://www.youtube.com/playlist?list=LL",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except FileNotFoundError as err:
+        raise IngestError("yt-dlp is not installed. Install with: brew install yt-dlp") from err
+
+    if result.returncode != 0:
+        raise IngestError(f"Failed to fetch liked videos: {result.stderr.strip()}")
+
+    return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
+
+
 def parse_ytdlp_metadata(metadata: dict) -> Video:
     return Video(
         youtube_id=metadata.get("id", ""),

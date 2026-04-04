@@ -36,3 +36,18 @@ def test_backfill_channels_scoped_to_video_ids(temp_db):
         result = backfill_channels(temp_db, video_ids=["aaa"])
 
     assert result == 1
+
+
+def test_fetch_liked_ids(temp_db):
+    from unittest.mock import patch, MagicMock
+    from yt_brain.infrastructure.ytdlp_adapter import fetch_liked_ids
+
+    fake_output = "abc123\ndef456\nghi789\n"
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = fake_output
+
+    with patch("yt_brain.infrastructure.ytdlp_adapter.subprocess.run", return_value=mock_result):
+        ids = fetch_liked_ids(browser="chrome")
+
+    assert ids == ["abc123", "def456", "ghi789"]
