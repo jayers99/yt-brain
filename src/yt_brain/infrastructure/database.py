@@ -329,6 +329,53 @@ def update_description(db_path: Path, youtube_id: str, description: str) -> None
         conn.close()
 
 
+def update_video_liked(db_path: Path, youtube_id: str, liked: str | None) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE videos SET liked = ?, updated_at = datetime('now') WHERE youtube_id = ?",
+            (liked, youtube_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def bulk_update_liked(db_path: Path, liked_map: dict[str, str | None]) -> None:
+    """Update liked status for multiple videos. liked_map = {youtube_id: 'like'|'dislike'|None}."""
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executemany(
+            "UPDATE videos SET liked = ?, updated_at = datetime('now') WHERE youtube_id = ?",
+            [(status, vid) for vid, status in liked_map.items()],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_published_at(db_path: Path, youtube_id: str, published_at: str) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE videos SET published_at = ?, updated_at = datetime('now') WHERE youtube_id = ?",
+            (published_at, youtube_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_all_video_ids(db_path: Path) -> set[str]:
+    """Return all youtube_ids in the database."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("SELECT youtube_id FROM videos")
+        return {row[0] for row in cursor.fetchall()}
+    finally:
+        conn.close()
+
+
 def is_video_liked(db_path: Path, youtube_id: str) -> bool:
     conn = sqlite3.connect(db_path)
     try:
