@@ -525,11 +525,7 @@ TEMPLATE = """
             border-left-color: var(--accent);
         }
         .card-scroll { overflow-y: auto; flex: 1; }
-        /* Skip rendering off-screen video rows — huge win for large lists */
-        #videoTable tbody tr {
-            content-visibility: auto;
-            contain-intrinsic-size: auto 37px;
-        }
+        /* Virtual scroll handles off-screen rows — only ~50 in DOM at a time */
         /* Suppress ALL transitions during resize to avoid per-frame composite work */
         .resizing, .resizing * {
             transition: none !important;
@@ -715,10 +711,10 @@ TEMPLATE = """
         let sortDirection = null;
         let likedFilterState = null;
 
-        // Pre-cache video data from DOM once — avoids DOM reads in filter loop
+        // Pre-cache video data from DOM once, then remove rows for virtual scroll
         const videoRows = document.querySelectorAll('#videoTable tbody tr');
         const videoData = Array.from(videoRows).map((row, idx) => ({
-            row,
+            html: row.outerHTML,
             originalIndex: idx,
             id: row.dataset.id,
             genre: row.dataset.genre,
@@ -727,11 +723,58 @@ TEMPLATE = """
             watchedTs: row.dataset.watched ? new Date(row.dataset.watched).getTime() : null,
             watched: row.dataset.watched || '',
             published: row.dataset.published || '',
-            publishedTs: row.dataset.published ? new Date(row.dataset.published).getTime() : null,
             title: (row.children[1]?.textContent || '').toLowerCase(),
             channel: row.children[2]?.textContent || '',
             channelLower: (row.children[2]?.textContent || '').toLowerCase(),
+            visible: true,
         }));
+
+        // Virtual scroll: only render rows in the viewport
+        const ROW_HEIGHT = 37;
+        const BUFFER_ROWS = 20;
+        let filteredIndices = videoData.map((_, i) => i); // indices into videoData that pass filters
+        const videoListEl = document.querySelector('.video-list');
+        const tbody = document.querySelector('#videoTable tbody');
+
+        // Clear server-rendered rows and set up virtual scroll spacer
+        tbody.innerHTML = '';
+        const spacerTop = document.createElement('tr');
+        spacerTop.id = 'vScrollTop';
+        spacerTop.innerHTML = '<td colspan="7" style="padding:0;border:0;height:0"></td>';
+        const spacerBottom = document.createElement('tr');
+        spacerBottom.id = 'vScrollBottom';
+        spacerBottom.innerHTML = '<td colspan="7" style="padding:0;border:0;height:0"></td>';
+
+        let lastRenderStart = -1;
+        function renderVisibleRows() {
+            const scrollTop = videoListEl.scrollTop;
+            const viewportHeight = videoListEl.clientHeight;
+            const totalRows = filteredIndices.length;
+            const totalHeight = totalRows * ROW_HEIGHT;
+
+            let startRow = Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS;
+            if (startRow < 0) startRow = 0;
+            let endRow = Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + BUFFER_ROWS;
+            if (endRow > totalRows) endRow = totalRows;
+
+            // Skip re-render if window hasn't shifted
+            if (startRow === lastRenderStart && tbody.children.length > 2) return;
+            lastRenderStart = startRow;
+
+            const topPad = startRow * ROW_HEIGHT;
+            const bottomPad = (totalRows - endRow) * ROW_HEIGHT;
+
+            const htmlParts = [];
+            htmlParts.push('<tr id="vScrollTop"><td colspan="7" style="padding:0;border:0;height:' + topPad + 'px"></td></tr>');
+            for (let i = startRow; i < endRow; i++) {
+                htmlParts.push(videoData[filteredIndices[i]].html);
+            }
+            htmlParts.push('<tr id="vScrollBottom"><td colspan="7" style="padding:0;border:0;height:' + bottomPad + 'px"></td></tr>');
+            tbody.innerHTML = htmlParts.join('');
+        }
+
+        videoListEl.addEventListener('scroll', renderVisibleRows);
+        renderVisibleRows();
 
         // Cache DOM refs
         const yearFilterEl = document.getElementById('yearFilter');
@@ -927,8 +970,6 @@ TEMPLATE = """
         }
 
         function applySortAndFilters() {
-            const tbody = document.querySelector('#videoTable tbody');
-
             if (sortColumn && sortDirection) {
                 const dir = sortDirection === 'asc' ? 1 : -1;
                 videoData.sort((a, b) => {
@@ -953,11 +994,8 @@ TEMPLATE = """
                 videoData.sort((a, b) => a.originalIndex - b.originalIndex);
             }
 
-            // Hide table to suppress all layout during reorder, then show.
-            const table = tbody.parentNode;
-            table.style.display = 'none';
-            for (const v of videoData) tbody.appendChild(v.row);
-            table.style.display = '';
+            // Rebuild filtered indices after sort reorder
+            applyFilters();
         }
 
         function toggleLikedFilter() {
@@ -1075,6 +1113,7 @@ TEMPLATE = """
             let visibleCount = 0;
             let minTs = Infinity, maxTs = -Infinity;
 
+            filteredIndices = [];
             for (let i = 0, len = videoData.length; i < len; i++) {
                 const v = videoData[i];
 
@@ -1093,7 +1132,7 @@ TEMPLATE = """
                 const passesNonGenre = dateOk && searchOk && starOk && likedOk;
                 const visible = passesNonGenre && genreOk;
 
-                v.row.style.display = visible ? '' : 'none';
+                if (visible) filteredIndices.push(i);
 
                 if (passesNonGenre) {
                     genreCounts[v.genre] = (genreCounts[v.genre] || 0) + 1;
@@ -1108,6 +1147,8 @@ TEMPLATE = """
                     }
                 }
             }
+            lastRenderStart = -1; // force re-render
+            renderVisibleRows();
 
             // Update genre counts and re-sort
             const genreRows = Array.from(genreTbody.children);
