@@ -953,14 +953,11 @@ TEMPLATE = """
                 videoData.sort((a, b) => a.originalIndex - b.originalIndex);
             }
 
-            // Detach tbody from DOM to avoid per-node reflow, reorder off-screen,
-            // then re-attach in one shot.
+            // Hide table to suppress all layout during reorder, then show.
             const table = tbody.parentNode;
-            table.removeChild(tbody);
-            const frag = document.createDocumentFragment();
-            for (const v of videoData) frag.appendChild(v.row);
-            tbody.appendChild(frag);
-            table.appendChild(tbody);
+            table.style.display = 'none';
+            for (const v of videoData) tbody.appendChild(v.row);
+            table.style.display = '';
         }
 
         function toggleLikedFilter() {
