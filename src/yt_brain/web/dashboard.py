@@ -134,7 +134,7 @@ TEMPLATE = """
             box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
             display: flex;
             flex-direction: column;
-            max-height: 500px;
+            max-height: 375px;
             overflow: hidden;
             min-width: 0;
             contain: layout style paint inline-size;
@@ -305,8 +305,8 @@ TEMPLATE = """
         .eng-WATCHED .num { color: #f59e0b; }
         .eng-LIKED .num { color: #22c55e; }
         .eng-CURATED .num { color: var(--accent); }
-        .video-list { max-height: 1000px; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
-        .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); contain: inline-size; }
+        .video-list { max-height: 700px; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
+        .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); max-height: 750px; contain: inline-size; }
         .video-list table { table-layout: fixed; width: 100%; max-width: 100%; }
         /* Column widths set inline via colgroup */
         #videoTable td, #videoTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
@@ -534,7 +534,9 @@ TEMPLATE = """
         #genreTable tbody tr:hover {
             border-left-color: var(--accent);
         }
-        .card-scroll { overflow-y: auto; flex: 1; }
+        .card-scroll { overflow: hidden; flex: 1; }
+        .card.scroll-active .card-scroll { overflow-y: auto; }
+        .card.scroll-active { border-color: var(--accent-dim); box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px var(--accent-glow); }
         /* Virtual scroll handles off-screen rows — only ~50 in DOM at a time */
         /* Suppress ALL transitions during resize to avoid per-frame composite work */
         .resizing, .resizing * {
@@ -1263,6 +1265,38 @@ TEMPLATE = """
                 }
             }
         }
+    /* Click-to-activate scroll for genre/channel cards */
+    (function() {
+        var cards = document.querySelectorAll('.card-scroll');
+        var activatable = [];
+        cards.forEach(function(el) {
+            var card = el.closest('.card');
+            if (card && !card.querySelector('.video-list')) activatable.push(card);
+        });
+        function deactivateAll() {
+            activatable.forEach(function(c) { c.classList.remove('scroll-active'); });
+        }
+        activatable.forEach(function(card) {
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('a[href]')) return;
+                e.stopPropagation();
+                if (card.classList.contains('scroll-active')) {
+                    card.classList.remove('scroll-active');
+                    return;
+                }
+                deactivateAll();
+                card.classList.add('scroll-active');
+            });
+        });
+        document.addEventListener('click', function(e) {
+            var inside = false;
+            activatable.forEach(function(c) { if (c.contains(e.target)) inside = true; });
+            if (!inside) deactivateAll();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') deactivateAll();
+        });
+    })();
     </script>
 </body>
 </html>
