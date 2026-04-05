@@ -19,7 +19,7 @@ def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
 
 
 # Migrations that require sqlite-vec loaded before they can run.
-_VEC_MIGRATIONS = {4, 5}
+_VEC_MIGRATIONS = {4, 5, 8}
 
 
 def init_db(db_path: Path) -> None:
