@@ -687,11 +687,11 @@ TEMPLATE = """
             <div class="card-scroll">
             <table id="channelTable" style="table-layout:fixed;width:100%">
                 <colgroup><col style="width:28px"><col style="width:35%"><col style="width:70px"><col></colgroup>
-                <thead><tr><th><span id="starFilter" class="star-btn" onclick="toggleStarFilter()" title="Show starred only">&#9733;</span></th><th>Channel</th><th>Count</th><th></th></tr></thead>
+                <thead><tr><th><span id="starFilter" class="star-btn" onclick="toggleStarFilter()" title="Show starred only"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg></span></th><th>Channel</th><th>Count</th><th></th></tr></thead>
                 <tbody>
                 {% for c in channel_stats %}
                 <tr>
-                    <td><span class="star-btn{% if c.starred %} starred{% endif %}" onclick="toggleStar(this, '{{ c.name | e }}')" title="Star channel">&#9733;</span></td>
+                    <td><span class="star-btn{% if c.starred %} starred{% endif %}" onclick="toggleStar(this, '{{ c.name | e }}')" title="Star channel"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg></span></td>
                     <td><a href="{{ c.url or 'https://www.youtube.com/results?search_query=' + c.name|urlencode }}" target="_blank" class="link-title">{{ c.name }}</a></td>
                     <td>{{ c.count }}</td>
                     <td>
@@ -1333,7 +1333,7 @@ TEMPLATE = """
                     const url = channelUrls[name] || `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
                     const starred = starredChannels.has(name) ? ' starred' : '';
                     const eName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">&#9733;</span></td><td><a href="${url}" target="_blank" class="link-title">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar-track"><div class="bar" style="width:${pct}%"></div></div><span class="bar-label">${pct}%</span></div></td></tr>`;
+                    return `<tr><td><span class="star-btn${starred}" onclick="toggleStar(this, '${eName}')" title="Star channel">${SVG_STAR}</span></td><td><a href="${url}" target="_blank" class="link-title">${name}</a></td><td>${count}</td><td><div class="bar-cell"><div class="bar-track"><div class="bar" style="width:${pct}%"></div></div><span class="bar-label">${pct}%</span></div></td></tr>`;
                 }).join('');
             }
 
