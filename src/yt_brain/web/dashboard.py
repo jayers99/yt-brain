@@ -86,6 +86,8 @@ TEMPLATE = """
             --accent-glow: rgba(99, 102, 241, 0.15);
             --accent-glow-strong: rgba(99, 102, 241, 0.25);
             --star-color: #f59e0b;
+            --liked-color: #22c55e;
+            --disliked-color: #ef4444;
             --link-primary: #8b8bf5;
             --link-channel: #7a7a8e;
             --font-display: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
@@ -364,25 +366,49 @@ TEMPLATE = """
             font-size: 14px;
         }
         .liked-icon {
-            opacity: 0.3;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
         }
         .liked-icon.liked {
-            opacity: 1;
+            color: var(--liked-color);
+        }
+        .liked-icon.liked .icon-svg {
+            fill: var(--liked-color);
+            fill-opacity: 0.9;
         }
         .liked-icon.disliked {
-            opacity: 1;
+            color: var(--disliked-color);
+        }
+        .liked-icon.disliked .icon-svg {
+            fill: var(--disliked-color);
+            fill-opacity: 0.5;
         }
         .liked-btn {
             cursor: pointer;
-            opacity: 0.3;
-            font-size: 14px;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
             user-select: none;
+            transition: color 0.2s ease, transform 0.15s ease;
+        }
+        .liked-btn:hover {
+            color: var(--text-secondary);
+            transform: scale(1.15);
         }
         .liked-btn.filter-like {
-            opacity: 1;
+            color: var(--liked-color);
+        }
+        .liked-btn.filter-like .icon-svg {
+            fill: var(--liked-color);
+            fill-opacity: 0.9;
         }
         .liked-btn.filter-dislike {
-            opacity: 1;
+            color: var(--disliked-color);
+        }
+        .liked-btn.filter-dislike .icon-svg {
+            fill: var(--disliked-color);
+            fill-opacity: 0.5;
         }
         /* Date columns */
         .date-cell {
@@ -506,9 +532,11 @@ TEMPLATE = """
             transition: all 0.15s;
         }
         input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
-        .star-btn { cursor: pointer; font-size: 16px; color: var(--text-muted); transition: color 0.2s ease, transform 0.15s ease; }
+        .icon-svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; transition: color 0.2s ease, fill 0.2s ease, transform 0.15s ease; }
+        .star-btn { cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center; transition: color 0.2s ease, transform 0.15s ease; }
         .star-btn:hover { color: var(--star-color); transform: scale(1.15); }
         .star-btn.starred { color: var(--star-color); }
+        .star-btn.starred .icon-svg { fill: var(--star-color); fill-opacity: 0.9; }
         .year-filter {
             background: var(--bg-elevated);
             color: var(--text-secondary);
@@ -758,6 +786,9 @@ TEMPLATE = """
     </div>
 
     <script>
+        const SVG_STAR = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>';
+        const SVG_THUMB_UP = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/></svg>';
+        const SVG_THUMB_DOWN = '<svg class="icon-svg" viewBox="0 0 24 24" style="transform:scaleY(-1)"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/></svg>';
         // Suppress transitions during resize to avoid jank
         let resizeTimer;
         window.addEventListener('resize', () => {
