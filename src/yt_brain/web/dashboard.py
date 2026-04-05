@@ -527,6 +527,11 @@ TEMPLATE = """
         .clear-btn { position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1;display:none;transition:color 0.15s ease; }
         .clear-btn:hover { color:var(--text-secondary); }
         .search-wrap .search-input:not(:placeholder-shown) + .clear-btn { display:block; }
+        .search-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+        .search-row .search-wrap { flex: 1; min-width: 0; }
+        .slider-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .slider-group input[type="range"] { width: 120px; accent-color: var(--accent); cursor: pointer; }
+        .slider-value { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); min-width: 35px; text-align: right; }
         #genreTable tbody tr {
             border-left: 3px solid transparent;
             transition: border-color 0.2s ease, background 0.15s ease;
@@ -537,6 +542,18 @@ TEMPLATE = """
         .card-scroll { overflow: hidden; flex: 1; }
         .card.scroll-active .card-scroll { overflow-y: auto; }
         .card.scroll-active { border-color: var(--accent-dim); box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px var(--accent-glow); }
+        .card-scroll.has-overflow { position: relative; }
+        .card-scroll.has-overflow::after {
+            content: attr(data-more-hint);
+            position: absolute; bottom: 0; left: 0; right: 0;
+            height: 60px;
+            background: linear-gradient(transparent, var(--bg-surface) 85%);
+            display: flex; align-items: flex-end; justify-content: center;
+            padding-bottom: 6px;
+            font-size: 12px; color: var(--text-muted);
+            pointer-events: none;
+        }
+        .card.scroll-active .card-scroll.has-overflow::after { display: none; }
         /* Virtual scroll handles off-screen rows — only ~50 in DOM at a time */
         /* Suppress ALL transitions during resize to avoid per-frame composite work */
         .resizing, .resizing * {
@@ -676,7 +693,15 @@ TEMPLATE = """
                     </colgroup>
                     <thead>
                         <tr>
-                            <th colspan="7" style="padding-bottom:12px"><div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div></th>
+                            <th colspan="7" style="padding-bottom:12px">
+                              <div class="search-row">
+                                <div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div>
+                                <div class="slider-group">
+                                  <input type="range" id="distanceSlider" min="0.1" max="1.2" step="0.05" value="0.6" oninput="onDistanceSliderInput()">
+                                  <span id="distanceValue" class="slider-value">0.60</span>
+                                </div>
+                              </div>
+                            </th>
                         </tr>
                         <tr>
                             <th><span id="likedFilter" class="liked-btn" onclick="toggleLikedFilter()" title="Filter by liked status">&#x1F44D;</span></th>
@@ -801,6 +826,7 @@ TEMPLATE = """
 
         // Semantic search state
         let semanticMatchIds = null;  // null = no search active, Set = matched IDs
+        let semanticRankMap = null;   // null = no search, Map(id → rank) for relevance sort
         let semanticTimer = null;
         let activeClusterFilter = null;
         let activeParentFilter = null;
@@ -948,6 +974,7 @@ TEMPLATE = """
             semanticSearchEl.value = '';
             semanticSearchEl.focus();
             semanticMatchIds = null;
+            semanticRankMap = null;
             activeClusterFilter = null;
             activeParentFilter = null;
             topicGridReset();
@@ -1002,6 +1029,14 @@ TEMPLATE = """
                     if (va > vb) return dir;
                     return 0;
                 });
+            } else if (semanticRankMap && semanticRankMap.size > 0) {
+                // Sort by search relevance when semantic search is active
+                const maxRank = semanticRankMap.size;
+                videoData.sort((a, b) => {
+                    const ra = semanticRankMap.has(a.id) ? semanticRankMap.get(a.id) : maxRank;
+                    const rb = semanticRankMap.has(b.id) ? semanticRankMap.get(b.id) : maxRank;
+                    return ra - rb;
+                });
             } else {
                 videoData.sort((a, b) => a.originalIndex - b.originalIndex);
             }
@@ -1035,9 +1070,10 @@ TEMPLATE = """
             const q = semanticSearchEl.value.trim();
             if (!q) {
                 semanticMatchIds = null;
+                semanticRankMap = null;
                 activeClusterFilter = null;
                 activeParentFilter = null;
-                applyFilters();
+                applySortAndFilters();
                 return;
             }
             // Check for category: filter (from parent click)
@@ -1062,14 +1098,17 @@ TEMPLATE = """
                     .then(data => {
                         if (data.results && data.results.length > 0) {
                             semanticMatchIds = new Set(data.results.map(r => r.youtube_id));
+                            semanticRankMap = new Map(data.results.map((r, i) => [r.youtube_id, i]));
                         } else {
                             semanticMatchIds = new Set();  // empty = nothing matches
+                            semanticRankMap = new Map();
                         }
-                        applyFilters();
+                        applySortAndFilters();
                     })
                     .catch(() => {
                         semanticMatchIds = null;
-                        applyFilters();
+                        semanticRankMap = null;
+                        applySortAndFilters();
                     });
             }, 300);
         }
@@ -1272,6 +1311,16 @@ TEMPLATE = """
         cards.forEach(function(el) {
             var card = el.closest('.card');
             if (card && !card.querySelector('.video-list')) activatable.push(card);
+            // Add overflow hint if content is clipped
+            if (el.scrollHeight > el.clientHeight) {
+                var totalRows = el.querySelectorAll('tbody tr').length;
+                var visibleRows = Math.floor(el.clientHeight / (el.querySelector('tbody tr') ? el.querySelector('tbody tr').offsetHeight : 30));
+                var moreCount = totalRows - visibleRows;
+                if (moreCount > 0) {
+                    el.classList.add('has-overflow');
+                    el.setAttribute('data-more-hint', 'Click to scroll (' + moreCount + ' more)');
+                }
+            }
         });
         function deactivateAll() {
             activatable.forEach(function(c) { c.classList.remove('scroll-active'); });
@@ -1507,6 +1556,7 @@ def create_app() -> Flask:
 
         q = request.args.get("q", "").strip()
         limit = min(int(request.args.get("limit", 50)), 200)
+        max_distance = float(request.args.get("max_distance", 0.6))
         if not q:
             return jsonify({"results": []})
 
@@ -1567,6 +1617,9 @@ def create_app() -> Flask:
             finally:
                 conn.close()
             results = filtered
+
+        # Filter by distance cutoff
+        results = [(vid, dist) for vid, dist in results if dist <= max_distance]
 
         return jsonify({
             "results": [{"youtube_id": vid, "distance": dist} for vid, dist in results]
