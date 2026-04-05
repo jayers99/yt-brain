@@ -3,9 +3,30 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from collections import Counter
 from pathlib import Path
+
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001f600-\U0001f64f"  # emoticons
+    "\U0001f300-\U0001f5ff"  # symbols & pictographs
+    "\U0001f680-\U0001f6ff"  # transport & map
+    "\U0001f1e0-\U0001f1ff"  # flags
+    "\U00002702-\U000027b0"  # dingbats
+    "\U0000fe00-\U0000fe0f"  # variation selectors
+    "\U0000200d"             # zero-width joiner
+    "\U00002600-\U000026ff"  # misc symbols
+    "\U0001f900-\U0001f9ff"  # supplemental symbols
+    "\U0001fa00-\U0001fa6f"  # chess symbols
+    "\U0001fa70-\U0001faff"  # symbols extended-A
+    "\U00002b50"             # star
+    "\U000023f0-\U000023ff"  # misc technical
+    "\U0000203c-\U00003299"  # misc CJK/enclosed
+    "]+",
+    flags=re.UNICODE,
+)
 
 from flask import Flask, jsonify, render_template_string, request, send_from_directory
 
@@ -724,7 +745,7 @@ TEMPLATE = """
                         <td class="liked-cell">{% if v.liked == 'like' %}<span class="liked-icon liked">&#x1F44D;</span>{% elif v.liked == 'dislike' %}<span class="liked-icon disliked">&#x1F44E;</span>{% endif %}</td>
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title }}</a></td>
                         <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
-                        <td><span class="genre-badge" style="background:{{ genre_colors.get(v.genre, '#333') }}22;color:{{ genre_colors.get(v.genre, '#888') }}">{{ v.genre }}</span></td>
+                        <td>{{ v.genre }}</td>
                         <td>{% if v.cluster %}<a href="#" class="link-cluster" onclick="filterByCluster('{{ v.cluster }}'); return false;">{{ v.cluster }}</a>{% endif %}</td>
                         <td class="date-cell">{{ v.watched_at[:10] if v.watched_at else '' }}</td>
                         <td class="date-cell">{{ v.published_at[:10] if v.published_at else '' }}</td>
@@ -1451,7 +1472,7 @@ def create_app() -> Flask:
 
             videos.append({
                 "id": v.youtube_id,
-                "title": v.title,
+                "title": _EMOJI_RE.sub("", v.title).strip(),
                 "channel": v.channel_id,
                 "genre": v.category or classify_genre(v.title),
                 "duration": v.duration_seconds,
