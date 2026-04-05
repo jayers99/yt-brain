@@ -371,18 +371,10 @@ TEMPLATE = """
             align-items: center;
         }
         .liked-icon.liked {
-            color: var(--liked-color);
-        }
-        .liked-icon.liked .icon-svg {
-            fill: var(--liked-color);
-            fill-opacity: 0.9;
+            color: var(--text-secondary);
         }
         .liked-icon.disliked {
-            color: var(--disliked-color);
-        }
-        .liked-icon.disliked .icon-svg {
-            fill: var(--disliked-color);
-            fill-opacity: 0.5;
+            color: var(--text-secondary);
         }
         .liked-btn {
             cursor: pointer;
@@ -397,14 +389,10 @@ TEMPLATE = """
             transform: scale(1.15);
         }
         .liked-btn.filter-like {
-            color: var(--liked-color);
-        }
-        .liked-btn.filter-like .icon-svg {
-            fill: var(--liked-color);
-            fill-opacity: 0.9;
+            color: var(--text-secondary);
         }
         .liked-btn.filter-dislike {
-            color: var(--disliked-color);
+            color: var(--text-secondary);
         }
         .liked-btn.filter-dislike .icon-svg {
             fill: var(--disliked-color);
