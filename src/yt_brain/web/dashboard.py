@@ -758,7 +758,7 @@ TEMPLATE = """
                             </th>
                         </tr>
                         <tr>
-                            <th><span id="likedFilter" class="liked-btn" onclick="toggleLikedFilter()" title="Filter by liked status">&#x1F44D;</span></th>
+                            <th><span id="likedFilter" class="liked-btn" onclick="toggleLikedFilter()" title="Filter by liked status"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/></svg></span></th>
                             <th class="sortable" data-sort="title" onclick="toggleSort('title')">Title</th>
                             <th class="sortable" data-sort="channel" onclick="toggleSort('channel')">Channel</th>
                             <th class="sortable" data-sort="genre" onclick="toggleSort('genre')">Genre</th>
@@ -770,7 +770,7 @@ TEMPLATE = """
                     <tbody>
                     {% for v in videos %}
                     <tr data-genre="{{ v.genre }}" data-watched="{{ v.watched_at }}" data-id="{{ v.id }}" data-cluster="{{ v.cluster }}" data-liked="{{ v.liked }}" data-published="{{ v.published_at }}">
-                        <td class="liked-cell">{% if v.liked == 'like' %}<span class="liked-icon liked">&#x1F44D;</span>{% elif v.liked == 'dislike' %}<span class="liked-icon disliked">&#x1F44E;</span>{% endif %}</td>
+                        <td class="liked-cell">{% if v.liked == 'like' %}<span class="liked-icon liked"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/></svg></span>{% elif v.liked == 'dislike' %}<span class="liked-icon disliked"><svg class="icon-svg" viewBox="0 0 24 24" style="transform:scaleY(-1)"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/></svg></span>{% endif %}</td>
                         <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" class="link-title">{{ v.title }}</a></td>
                         <td class="channel"><a href="{{ v.channel_url or 'https://www.youtube.com/results?search_query=' + v.channel|urlencode }}" target="_blank" class="link-channel">{{ v.channel[:20] }}</a></td>
                         <td>{{ v.genre }}</td>
@@ -1110,16 +1110,16 @@ TEMPLATE = """
                 likedFilterState = 'like';
                 btn.classList.add('filter-like');
                 btn.classList.remove('filter-dislike');
-                btn.innerHTML = '&#x1F44D;';
+                btn.innerHTML = SVG_THUMB_UP;
             } else if (likedFilterState === 'like') {
                 likedFilterState = 'dislike';
                 btn.classList.remove('filter-like');
                 btn.classList.add('filter-dislike');
-                btn.innerHTML = '&#x1F44E;';
+                btn.innerHTML = SVG_THUMB_DOWN;
             } else {
                 likedFilterState = null;
                 btn.classList.remove('filter-like', 'filter-dislike');
-                btn.innerHTML = '&#x1F44D;';
+                btn.innerHTML = SVG_THUMB_UP;
             }
             applyFilters();
         }
