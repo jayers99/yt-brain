@@ -7,7 +7,7 @@ Feature: Database Storage
     And the channels table exists
     And the playlists table exists
     And the playlist_videos table exists
-    And the schema_version is 1
+    And the schema_version is 8
 
   Scenario: Save and retrieve a video
     Given a fresh database

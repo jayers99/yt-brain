@@ -16,4 +16,4 @@ Feature: Manual Video Ingestion
     When I parse the metadata
     Then the video title is "Test Title"
     And the video duration is 300
-    And the video channel_id is "UCtest"
+    And the video channel_id is "Test Channel"

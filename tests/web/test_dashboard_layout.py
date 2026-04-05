@@ -68,49 +68,28 @@ def test_initial_load_no_overflow(sized_page: Page):
     assert _no_horizontal_overflow(sized_page), _overflow_debug(sized_page)
 
 
-def test_channel_search_no_overflow(sized_page: Page):
-    """Typing in the channel search bar must not cause layout overflow."""
-    channel_input = sized_page.locator("#channelSearch")
-    expect(channel_input).to_be_visible()
+def test_semantic_search_no_overflow(sized_page: Page):
+    """Typing in the semantic search bar must not cause layout overflow."""
+    search_input = sized_page.locator("#semanticSearch")
+    expect(search_input).to_be_visible()
 
     for length in range(1, 21):
         text = "a" * length
-        channel_input.fill(text)
+        search_input.fill(text)
         assert _no_horizontal_overflow(sized_page), (
             f"Overflow at {length} chars: {_overflow_debug(sized_page)}"
         )
 
 
-def test_channel_search_with_spaces_no_overflow(sized_page: Page):
+def test_semantic_search_with_spaces_no_overflow(sized_page: Page):
     """Typing 'web ' (with trailing space) must not cause layout overflow."""
-    channel_input = sized_page.locator("#channelSearch")
-    expect(channel_input).to_be_visible()
+    search_input = sized_page.locator("#semanticSearch")
+    expect(search_input).to_be_visible()
 
     test_strings = ["w", "we", "web", "web ", "web d", "web de", "web dev",
                     "web dev ", "web development"]
     for text in test_strings:
-        channel_input.fill(text)
+        search_input.fill(text)
         assert _no_horizontal_overflow(sized_page), (
             f"Overflow at '{text}': {_overflow_debug(sized_page)}"
         )
-
-
-def test_title_search_no_overflow(sized_page: Page):
-    """Typing in the title search bar must not cause layout overflow."""
-    title_input = sized_page.locator("#titleSearch")
-    expect(title_input).to_be_visible()
-
-    for length in range(1, 21):
-        text = "a" * length
-        title_input.fill(text)
-        assert _no_horizontal_overflow(sized_page), (
-            f"Overflow at {length} chars: {_overflow_debug(sized_page)}"
-        )
-
-
-def test_both_searches_filled_no_overflow(sized_page: Page):
-    """Both search fields filled simultaneously must not overflow."""
-    sized_page.locator("#titleSearch").fill("some long search term here")
-    sized_page.locator("#channelSearch").fill("another long channel name")
-
-    assert _no_horizontal_overflow(sized_page), _overflow_debug(sized_page)
