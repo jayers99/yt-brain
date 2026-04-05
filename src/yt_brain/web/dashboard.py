@@ -305,8 +305,9 @@ TEMPLATE = """
         .eng-WATCHED .num { color: #f59e0b; }
         .eng-LIKED .num { color: #22c55e; }
         .eng-CURATED .num { color: var(--accent); }
-        .video-list { max-height: 700px; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
-        .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); max-height: 750px; contain: inline-size; }
+        .video-list { flex: 1; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
+        .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); contain: inline-size; }
+        #allVideosCard { height: 750px; max-height: 750px; }
         .video-list table { table-layout: fixed; width: 100%; max-width: 100%; }
         /* Column widths set inline via colgroup */
         #videoTable td, #videoTable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
@@ -532,6 +533,8 @@ TEMPLATE = """
         .slider-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .slider-group input[type="range"] { width: 120px; accent-color: var(--accent); cursor: pointer; }
         .slider-value { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); min-width: 35px; text-align: right; }
+        .nudge-btn { background: none; border: 1px solid var(--border-default); color: var(--text-muted); border-radius: 4px; width: 20px; height: 20px; cursor: pointer; font-size: 11px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s ease, color 0.15s ease; }
+        .nudge-btn:hover { border-color: var(--accent); color: var(--text-secondary); }
         #genreTable tbody tr {
             border-left: 3px solid transparent;
             transition: border-color 0.2s ease, background 0.15s ease;
@@ -678,7 +681,7 @@ TEMPLATE = """
         </div>
         {% endif %}
 
-        <div class="card card-primary full-width">
+        <div class="card card-primary full-width" id="allVideosCard">
             <h2>All Videos</h2>
             <div class="video-list">
                 <table id="videoTable">
@@ -697,7 +700,9 @@ TEMPLATE = """
                               <div class="search-row">
                                 <div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div>
                                 <div class="slider-group">
+                                  <button class="nudge-btn" onclick="nudgeSlider(-0.05)" title="Tighter">&lsaquo;</button>
                                   <input type="range" id="distanceSlider" min="0.1" max="1.2" step="0.05" value="0.6" oninput="onDistanceSliderInput()">
+                                  <button class="nudge-btn" onclick="nudgeSlider(0.05)" title="Broader">&rsaquo;</button>
                                   <span id="distanceValue" class="slider-value">0.60</span>
                                 </div>
                               </div>
@@ -1065,6 +1070,13 @@ TEMPLATE = """
                 btn.innerHTML = '&#x1F44D;';
             }
             applyFilters();
+        }
+
+        function nudgeSlider(delta) {
+            const slider = document.getElementById('distanceSlider');
+            const val = Math.min(1.2, Math.max(0.1, parseFloat(slider.value) + delta));
+            slider.value = val.toFixed(2);
+            onDistanceSliderInput();
         }
 
         function onDistanceSliderInput() {
