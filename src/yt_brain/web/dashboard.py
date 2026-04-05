@@ -570,6 +570,7 @@ TEMPLATE = """
         .slider-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .slider-group input[type="range"] { width: 120px; accent-color: var(--accent); cursor: pointer; }
         .slider-value { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); min-width: 35px; text-align: right; }
+        .results-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); width: 115px; text-align: right; flex-shrink: 0; white-space: nowrap; }
         .nudge-btn { background: none; border: 1px solid var(--border-default); color: var(--text-muted); border-radius: 4px; width: 20px; height: 20px; cursor: pointer; font-size: 11px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s ease, color 0.15s ease; }
         .nudge-btn:hover { border-color: var(--accent); color: var(--text-secondary); }
         #genreTable tbody tr {
@@ -579,7 +580,7 @@ TEMPLATE = """
         #genreTable tbody tr:hover {
             border-left-color: var(--accent);
         }
-        .card-scroll { overflow: hidden; flex: 1; }
+        .card-scroll { overflow: hidden; flex: 1; scrollbar-gutter: stable; }
         .card.scroll-active .card-scroll { overflow-y: auto; }
         .card.scroll-active { border-color: var(--accent-dim); box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px var(--accent-glow); }
         .card-scroll.has-overflow { position: relative; }
@@ -736,6 +737,7 @@ TEMPLATE = """
                             <th colspan="7" style="padding-bottom:12px">
                               <div class="search-row">
                                 <div class="search-wrap"><input type="text" id="semanticSearch" placeholder="{{ 'Search by topic, concept, or keyword...' if has_embeddings else 'Run yt-brain embed to enable semantic search' }}" {{ '' if has_embeddings else 'disabled' }} oninput="scheduleSemanticSearch()" class="search-input" style="width:100%"><span class="clear-btn" onclick="clearSearch()">&times;</span></div>
+                                <span id="resultsCount" class="results-count">{{ "{:,}".format(videos|length) }} results</span>
                                 <div class="slider-group">
                                   <button class="nudge-btn" onclick="nudgeSlider(-0.05)" title="Tighter">&lsaquo;</button>
                                   <input type="range" id="distanceSlider" min="0.1" max="1.2" step="0.05" value="0.6" oninput="onDistanceSliderInput()">
@@ -1288,6 +1290,7 @@ TEMPLATE = """
 
             // Update stats (order: Top Genre, Genres, Channels, Total Videos)
             filteredCountEl.textContent = visibleCount;
+            document.getElementById('resultsCount').textContent = visibleCount.toLocaleString('en-US') + ' results';
 
             let topGenre = '-';
             let topCount = 0;
