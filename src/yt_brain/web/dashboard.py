@@ -972,6 +972,8 @@ TEMPLATE = """
 
         function clearSearch() {
             semanticSearchEl.value = '';
+            document.getElementById('distanceSlider').value = 0.6;
+            document.getElementById('distanceValue').textContent = '0.60';
             semanticSearchEl.focus();
             semanticMatchIds = null;
             semanticRankMap = null;
@@ -1065,6 +1067,12 @@ TEMPLATE = """
             applyFilters();
         }
 
+        function onDistanceSliderInput() {
+            document.getElementById('distanceValue').textContent =
+                parseFloat(document.getElementById('distanceSlider').value).toFixed(2);
+            scheduleSemanticSearch();
+        }
+
         function scheduleSemanticSearch() {
             if (semanticTimer) clearTimeout(semanticTimer);
             const q = semanticSearchEl.value.trim();
@@ -1093,7 +1101,7 @@ TEMPLATE = """
             activeParentFilter = null;
             // Debounce 150ms for API call (model is preloaded)
             semanticTimer = setTimeout(() => {
-                fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=200')
+                fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=200&max_distance=' + document.getElementById('distanceSlider').value)
                     .then(r => r.json())
                     .then(data => {
                         if (data.results && data.results.length > 0) {
