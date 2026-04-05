@@ -305,7 +305,7 @@ TEMPLATE = """
         .eng-WATCHED .num { color: #f59e0b; }
         .eng-LIKED .num { color: #22c55e; }
         .eng-CURATED .num { color: var(--accent); }
-        .video-list { flex: 1; overflow-y: auto; overflow-x: hidden; width: 100%; min-width: 0; }
+        .video-list { flex: 1; overflow-x: hidden; width: 100%; min-width: 0; }
         .card.full-width { overflow: hidden; min-width: 0; width: 100%; max-width: calc(100vw - 80px); contain: inline-size; }
         #allVideosCard { height: 750px; max-height: 750px; }
         .video-list table { table-layout: fixed; width: 100%; max-width: 100%; }
@@ -683,7 +683,7 @@ TEMPLATE = """
 
         <div class="card card-primary full-width" id="allVideosCard">
             <h2>All Videos</h2>
-            <div class="video-list">
+            <div class="video-list card-scroll">
                 <table id="videoTable">
                     <colgroup>
                         <col style="width:4%">
@@ -1330,9 +1330,17 @@ TEMPLATE = """
         var activatable = [];
         cards.forEach(function(el) {
             var card = el.closest('.card');
-            if (card && !card.querySelector('.video-list')) activatable.push(card);
+            if (card) activatable.push(card);
             // Add overflow hint if content is clipped
-            if (el.scrollHeight > el.clientHeight) {
+            if (el.classList.contains('video-list')) {
+                // Virtual-scroll table: rows aren't measured at load, use video count
+                var total = videoData.length;
+                var visRows = Math.floor(el.clientHeight / ROW_HEIGHT);
+                if (total > visRows) {
+                    el.classList.add('has-overflow');
+                    el.setAttribute('data-more-hint', 'Click to scroll (' + (total - visRows) + ' more)');
+                }
+            } else if (el.scrollHeight > el.clientHeight) {
                 var totalRows = el.querySelectorAll('tbody tr').length;
                 var visibleRows = Math.floor(el.clientHeight / (el.querySelector('tbody tr') ? el.querySelector('tbody tr').offsetHeight : 30));
                 var moreCount = totalRows - visibleRows;
