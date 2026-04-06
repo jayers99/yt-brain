@@ -5,6 +5,15 @@ description = "YouTube knowledge brain — ingest, classify, and curate your You
 authors = [{ name = "jayers99" }]
 readme = "README.md"
 license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+]
 requires-python = ">=3.12"
 dependencies = [
     "typer>=0.15.1",
@@ -20,6 +29,11 @@ dependencies = [
 
 [project.optional-dependencies]
 ai = ["anthropic>=0.42.0"]
+
+[project.urls]
+Homepage = "https://github.com/jayers99/yt-brain"
+Repository = "https://github.com/jayers99/yt-brain"
+"Bug Tracker" = "https://github.com/jayers99/yt-brain/issues"
 
 [project.scripts]
 yt-brain = "yt_brain.cli:app"
