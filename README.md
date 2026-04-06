@@ -23,7 +23,7 @@ yt-brain ingests your YouTube watch history, classifies videos by genre and chan
 pip install yt-brain
 ```
 
-**[Installation & Setup Guide](INSTALL.md)** — yt-brain requires external tools and API keys. Follow the setup guide before first use.
+**[Installation & Setup Guide](https://github.com/jayers99/yt-brain/blob/main/INSTALL.md)** — yt-brain requires external tools and API keys. Follow the setup guide before first use.
 
 ## Commands
 
@@ -83,7 +83,7 @@ Data stored in SQLite at `~/.config/yt-brain/yt-brain.db`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+See [CONTRIBUTING.md](https://github.com/jayers99/yt-brain/blob/main/CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 
