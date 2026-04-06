@@ -4,12 +4,6 @@ Turn passive YouTube watching into active knowledge.
 
 yt-brain ingests your YouTube watch history, classifies videos by genre and channel, and provides an interactive dashboard to explore your viewing patterns. Built as a foundation for semantic clustering, NotebookLM export, and Obsidian integration.
 
-## Install
-
-```bash
-uv sync
-```
-
 ## Quick Start
 
 ```bash
@@ -91,21 +85,77 @@ Filters are combinable: `machine learning title:"python" channel:"sentdex"`
 
 ## Setup
 
-### Google Takeout (recommended)
+### Prerequisites
+
+- **Python 3.12+**
+- **uv** ([install guide](https://docs.astral.sh/uv/getting-started/installation/))
+- **yt-dlp** (for `sync`, `history`, and `transcript` commands)
+  - Install: `uv tool install yt-dlp` or `brew install yt-dlp`
+  - Must be logged into YouTube in your browser for `sync` and `history`
+
+### Install
+
+```bash
+git clone https://github.com/jayers99/yt-brain.git
+cd yt-brain
+uv sync
+```
+
+To enable AI-powered cluster naming (optional):
+
+```bash
+uv sync --extra ai
+```
+
+### Google Takeout (recommended starting point)
 
 1. Go to [takeout.google.com](https://takeout.google.com)
-2. Select only **YouTube and YouTube Music** > **history**
-3. Export and download the zip
-4. `yt-brain ingest takeout ~/Downloads/takeout-*.zip`
+2. Deselect all, then select only **YouTube and YouTube Music** > **history**
+3. Choose JSON format (not HTML)
+4. Export and download the zip
+5. Run: `yt-brain ingest takeout ~/Downloads/takeout-*.zip`
 
-### YouTube Data API Key (optional)
+### API Keys (optional)
 
-Required for `backfill-dates`, `backfill-categories`, `backfill-descriptions`, `fetch`, and `sync`.
+API keys enable additional features. Set them via environment variables or config file.
+
+**YouTube Data API Key** — needed for `backfill-dates`, `backfill-categories`, `backfill-descriptions`, `fetch`, and `sync`:
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
-2. Enable the YouTube Data API v3
-3. Create an API key under Credentials
-4. The key is stored in `~/.config/yt-brain/config.yaml`
+2. Enable **YouTube Data API v3**
+3. Create an API key under **Credentials**
+4. Set it:
+   ```bash
+   # Option 1: Environment variable
+   export YOUTUBE_API_KEY="your-key-here"
+
+   # Option 2: Config file (~/.config/yt-brain/config.yaml)
+   yt-brain config  # then add youtube_api_key: your-key-here
+   ```
+
+**Anthropic API Key** — needed for AI-powered cluster naming (optional, falls back to numeric names):
+
+```bash
+# Option 1: Environment variable
+export ANTHROPIC_API_KEY="your-key-here"
+
+# Option 2: Config file
+# Add to ~/.config/yt-brain/config.yaml:
+# anthropic_api_key: your-key-here
+```
+
+### Browser Cookies (for sync/history)
+
+The `sync` and `history` commands use yt-dlp to read your browser's YouTube cookies. You must be logged into YouTube in your browser. By default, Chrome is used:
+
+```bash
+yt-brain sync                  # uses Chrome
+yt-brain sync --browser firefox  # use Firefox instead
+```
+
+Supported browsers: chrome, firefox, edge, safari, opera, brave.
+
+> **Note:** Cookie access may require granting terminal/yt-dlp access in your OS security settings (macOS: System Settings > Privacy & Security > Full Disk Access).
 
 ## Architecture
 
