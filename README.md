@@ -4,6 +4,8 @@ Turn passive YouTube watching into active knowledge.
 
 yt-brain ingests your YouTube watch history, classifies videos by genre and channel, and provides an interactive dashboard to explore your viewing patterns. Built as a foundation for semantic clustering, NotebookLM export, and Obsidian integration.
 
+![yt-brain Dashboard](docs/app_screen_shot.png)
+
 ## Quick Start
 
 ```bash
