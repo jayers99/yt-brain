@@ -6,7 +6,7 @@ Turn passive YouTube watching into active knowledge.
 
 yt-brain ingests your YouTube watch history, classifies videos by genre and channel, and provides an interactive dashboard to explore your viewing patterns.
 
-![yt-brain Dashboard](docs/app_screen_shot.jpg)
+![yt-brain Dashboard](https://raw.githubusercontent.com/jayers99/yt-brain/main/docs/app_screen_shot.jpg)
 
 ## Features
 
