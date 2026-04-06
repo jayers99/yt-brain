@@ -511,6 +511,52 @@ def config() -> None:
     console.print(table)
 
 
+@app.command()
+def doctor() -> None:
+    """Check that all prerequisites are installed and configured."""
+    from yt_brain.application.doctor import CheckStatus, run_doctor
+    from yt_brain.infrastructure.config import load_config
+
+    config = load_config()
+    db_path = config.db_path
+
+    results = run_doctor(
+        youtube_api_key=config.youtube_api_key,
+        anthropic_api_key=config.anthropic_api_key,
+        db_path=db_path,
+    )
+
+    console.print()
+    console.print("[bold]yt-brain prerequisites check[/bold]")
+    console.print("─" * 34)
+
+    status_icons = {
+        CheckStatus.OK: "[green]✅[/green]",
+        CheckStatus.FAIL: "[red]❌[/red]",
+        CheckStatus.WARN: "[yellow]⚠️[/yellow] ",
+        CheckStatus.INFO: "[blue]ℹ️[/blue] ",
+    }
+
+    for r in results:
+        icon = status_icons[r.status]
+        console.print(f" {icon} {r.name:<20s} {r.detail}")
+
+    failures = [r for r in results if r.status == CheckStatus.FAIL]
+    warnings = [r for r in results if r.status == CheckStatus.WARN]
+
+    console.print()
+    if failures:
+        console.print(
+            f"[red]❌ {len(failures)} issue(s) found. "
+            "See https://github.com/jayers99/yt-brain/blob/main/INSTALL.md[/red]"
+        )
+        raise typer.Exit(1)
+    elif warnings:
+        console.print(f"[yellow]⚠️  {len(warnings)} warning(s). Everything critical is OK.[/yellow]")
+    else:
+        console.print("[green]All prerequisites OK.[/green]")
+
+
 @app.command("backfill-dates")
 def backfill_dates() -> None:
     """Backfill missing video dates via YouTube Data API."""
