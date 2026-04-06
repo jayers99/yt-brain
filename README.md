@@ -109,6 +109,28 @@ To enable AI-powered cluster naming (optional):
 uv sync --extra ai
 ```
 
+Alternatively, install with pip into any existing environment:
+
+```bash
+pip install .
+```
+
+### Makefile
+
+A `Makefile` is included for common dev tasks:
+
+| Target | Command |
+|--------|---------|
+| `make install` | `uv sync` — install core dependencies |
+| `make dev` | `uv sync --dev --extra ai` — install all dev + optional deps |
+| `make test` | `uv run pytest -v` |
+| `make lint` | `uv run ruff check src/ tests/` |
+| `make typecheck` | `uv run mypy` |
+| `make run` | `uv run yt-brain dashboard` |
+| `make clean` | Remove `__pycache__`, caches, build artifacts |
+
+Run `make` with no arguments to see available targets.
+
 ### Google Takeout (recommended starting point)
 
 1. Go to [takeout.google.com](https://takeout.google.com)
