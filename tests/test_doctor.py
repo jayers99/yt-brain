@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
 import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -15,6 +16,7 @@ from yt_brain.application.doctor import (
     check_sqlite_vec,
     check_youtube_api_key,
     check_ytdlp,
+    run_doctor,
 )
 
 
@@ -211,3 +213,88 @@ class TestCheckDatabase:
         conn.close()
         result = check_database(temp_db)
         assert "1,001 videos" in result.detail
+
+
+class TestRunDoctor:
+    def test_returns_all_checks(self, temp_db):
+        with (
+            patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
+            patch(
+                "yt_brain.application.doctor.subprocess.run",
+                return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
+            ),
+        ):
+            results = run_doctor(
+                youtube_api_key="",
+                anthropic_api_key="",
+                db_path=temp_db,
+            )
+        assert len(results) == 6
+        names = [r.name for r in results]
+        assert "sqlite-vec" in names
+        assert "yt-dlp" in names
+        assert "YouTube API key" in names
+        assert "Anthropic API key" in names
+        assert "browser cookies" in names
+        assert "database" in names
+
+    def test_has_failures_when_deps_missing(self, temp_db):
+        with (
+            patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False),
+            patch(
+                "yt_brain.application.doctor.subprocess.run",
+                side_effect=FileNotFoundError,
+            ),
+        ):
+            results = run_doctor(
+                youtube_api_key="",
+                anthropic_api_key="",
+                db_path=temp_db,
+            )
+        failures = [r for r in results if r.status == CheckStatus.FAIL]
+        assert len(failures) >= 2
+
+
+class TestDoctorCli:
+    def test_doctor_runs(self, temp_config_dir):
+        from typer.testing import CliRunner
+
+        from yt_brain.cli import app
+
+        runner = CliRunner()
+        with (
+            patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
+            patch(
+                "yt_brain.application.doctor.subprocess.run",
+                return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
+            ),
+            patch("yt_brain.application.doctor.urllib.request.urlopen") as mock_url,
+        ):
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = json.dumps({"items": []}).encode()
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_url.return_value = mock_resp
+            result = runner.invoke(app, ["doctor"])
+
+        assert "prerequisites check" in result.output
+        assert "sqlite-vec" in result.output
+        assert "yt-dlp" in result.output
+
+    def test_doctor_exit_code_1_on_failure(self, temp_config_dir):
+        from typer.testing import CliRunner
+
+        from yt_brain.cli import app
+
+        runner = CliRunner()
+        with (
+            patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False),
+            patch(
+                "yt_brain.application.doctor.subprocess.run",
+                side_effect=FileNotFoundError,
+            ),
+        ):
+            result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 1
+        assert "issue(s) found" in result.output

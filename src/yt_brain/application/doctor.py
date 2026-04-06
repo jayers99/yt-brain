@@ -116,3 +116,19 @@ def check_database(db_path: Path) -> CheckResult:
         return CheckResult("database", CheckStatus.WARN, "database exists but schema is missing or corrupt")
     finally:
         conn.close()
+
+
+def run_doctor(
+    youtube_api_key: str,
+    anthropic_api_key: str,
+    db_path: Path,
+) -> list[CheckResult]:
+    """Run all prerequisite checks and return results."""
+    return [
+        check_sqlite_vec(),
+        check_ytdlp(),
+        check_youtube_api_key(youtube_api_key),
+        check_anthropic_api_key(anthropic_api_key),
+        check_browser_cookies(),
+        check_database(db_path),
+    ]
