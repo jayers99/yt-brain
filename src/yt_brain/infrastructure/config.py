@@ -83,7 +83,7 @@ def require_api_key(config: YtBrainConfig, key_name: str) -> str:
         raise ConfigError(
             f"Missing {key_name}. Set it via:\n"
             f"  1. Environment variable: export {env_var}=<your-key>\n"
-            f"  2. Config file: ~/.config/yt-brain/config.yaml"
+            f"  2. Config file: {config.config_file}"
         )
     return value
 
