@@ -8,9 +8,25 @@ from pathlib import Path
 from yt_brain.domain.errors import DatabaseError
 from yt_brain.domain.models import Cluster, EngagementLevel, Source, Video
 
+# Detect sqlite-vec availability at import time.
+try:
+    import sqlite_vec as _sqlite_vec  # noqa: F401
+
+    SQLITE_VEC_AVAILABLE = True
+except ImportError:
+    SQLITE_VEC_AVAILABLE = False
+
+_SQLITE_VEC_MSG = (
+    "sqlite-vec is not installed. Embedding and clustering features are unavailable.\n"
+    "Install it with: uv sync  (or pip install sqlite-vec)\n"
+    "All other yt-brain features work without it."
+)
+
 
 def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
     """Load the sqlite-vec extension into a connection."""
+    if not SQLITE_VEC_AVAILABLE:
+        raise DatabaseError(_SQLITE_VEC_MSG)
     import sqlite_vec
 
     conn.enable_load_extension(True)
@@ -18,8 +34,8 @@ def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
     conn.enable_load_extension(False)
 
 
-# Migrations that require sqlite-vec loaded before they can run.
-_VEC_MIGRATIONS = {4, 5, 8}
+# Migrations that create sqlite-vec virtual tables and require the extension loaded.
+_VEC_MIGRATIONS = {4, 8}
 
 
 def init_db(db_path: Path) -> None:
@@ -44,6 +60,8 @@ def init_db(db_path: Path) -> None:
             version = int(mig_file.name.split("_")[0])
             if version > current_version:
                 if version in _VEC_MIGRATIONS:
+                    if not SQLITE_VEC_AVAILABLE:
+                        continue  # Skip vec migrations gracefully
                     _load_sqlite_vec(conn)
                 conn.executescript(mig_file.read_text())
     finally:

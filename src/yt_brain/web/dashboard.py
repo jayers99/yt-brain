@@ -32,6 +32,7 @@ from flask import Flask, jsonify, render_template_string, request, send_from_dir
 
 from yt_brain.infrastructure.config import load_config
 from yt_brain.infrastructure.database import (
+    SQLITE_VEC_AVAILABLE,
     get_all_videos,
     get_channel_urls,
     get_embedding_count,
@@ -1443,6 +1444,23 @@ GENRE_COLORS = {
 }
 
 
+def _text_search(db_path: Path, query: str, limit: int) -> tuple:
+    """Fall back to SQL LIKE search when sqlite-vec is unavailable."""
+    conn = sqlite3.connect(db_path)
+    try:
+        pattern = f"%{query}%"
+        rows = conn.execute(
+            "SELECT youtube_id FROM videos "
+            "WHERE title LIKE ? OR description LIKE ? OR channel_id LIKE ? "
+            "ORDER BY watched_at DESC LIMIT ?",
+            (pattern, pattern, pattern, limit),
+        ).fetchall()
+        results = [{"youtube_id": row[0]} for row in rows]
+        return jsonify({"results": results, "mode": "text"}), 200
+    finally:
+        conn.close()
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
 
@@ -1612,13 +1630,18 @@ def create_app() -> Flask:
 
     # Preload embedding model at startup if embeddings exist
     config = load_config()
-    if get_embedding_count(config.db_path) > 0:
-        import struct as _struct
+    _vec_ok = SQLITE_VEC_AVAILABLE
+    if _vec_ok:
+        try:
+            if get_embedding_count(config.db_path) > 0:
+                import struct as _struct
 
-        from sentence_transformers import SentenceTransformer as _ST
+                from sentence_transformers import SentenceTransformer as _ST
 
-        app._embed_model = _ST("all-MiniLM-L6-v2")
-        app._struct = _struct
+                app._embed_model = _ST("all-MiniLM-L6-v2")
+                app._struct = _struct
+        except Exception:
+            _vec_ok = False
 
     @app.route("/api/search")
     def api_search():
@@ -1633,7 +1656,8 @@ def create_app() -> Flask:
             return jsonify({"results": []})
 
         if not hasattr(app, "_embed_model"):
-            return jsonify({"results": [], "error": "No embeddings. Run: yt-brain embed"}), 200
+            # Fall back to text-based LIKE search
+            return _text_search(config.db_path, q, limit)
 
         # Extract field-specific filters: title:"x", desc:"x", channel:"x"
         # and bare quoted terms: "x" (matches title or description)
