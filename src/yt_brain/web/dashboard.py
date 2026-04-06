@@ -1448,10 +1448,12 @@ def _text_search(db_path: Path, query: str, limit: int) -> tuple:
     """Fall back to SQL LIKE search when sqlite-vec is unavailable."""
     conn = sqlite3.connect(db_path)
     try:
-        pattern = f"%{query}%"
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
         rows = conn.execute(
             "SELECT youtube_id FROM videos "
-            "WHERE title LIKE ? OR description LIKE ? OR channel_id LIKE ? "
+            "WHERE title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' "
+            "OR channel_id LIKE ? ESCAPE '\\' "
             "ORDER BY watched_at DESC LIMIT ?",
             (pattern, pattern, pattern, limit),
         ).fetchall()

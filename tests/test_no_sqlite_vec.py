@@ -12,19 +12,17 @@ import pytest
 
 @pytest.fixture
 def db_no_vec() -> Path:
-    """Create a DB with init_db, but with sqlite-vec import mocked to fail."""
+    """Create a DB with init_db, but with sqlite-vec flag disabled."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
-        with patch.dict("sys.modules", {"sqlite_vec": None}):
-            # Re-evaluate the flag by reloading
-            import yt_brain.infrastructure.database as db_mod
+        import yt_brain.infrastructure.database as db_mod
 
-            original = db_mod.SQLITE_VEC_AVAILABLE
-            db_mod.SQLITE_VEC_AVAILABLE = False
-            try:
-                db_mod.init_db(db_path)
-            finally:
-                db_mod.SQLITE_VEC_AVAILABLE = original
+        original = db_mod.SQLITE_VEC_AVAILABLE
+        db_mod.SQLITE_VEC_AVAILABLE = False
+        try:
+            db_mod.init_db(db_path)
+        finally:
+            db_mod.SQLITE_VEC_AVAILABLE = original
         yield db_path
 
 
@@ -185,3 +183,27 @@ class TestDashboardSearchFallback:
                 data = resp.get_json()
                 assert resp.status_code == 200
                 assert data["results"] == []
+
+
+class TestCliEarlyGuards:
+    """CLI embed and cluster commands should exit cleanly when sqlite-vec is unavailable."""
+
+    def test_embed_exits_without_sqlite_vec(self):
+        from typer.testing import CliRunner
+        from yt_brain.cli import app
+
+        runner = CliRunner()
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
+            result = runner.invoke(app, ["embed"])
+        assert result.exit_code == 1
+        assert "sqlite-vec is not installed" in result.output
+
+    def test_cluster_exits_without_sqlite_vec(self):
+        from typer.testing import CliRunner
+        from yt_brain.cli import app
+
+        runner = CliRunner()
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
+            result = runner.invoke(app, ["cluster"])
+        assert result.exit_code == 1
+        assert "sqlite-vec is not installed" in result.output

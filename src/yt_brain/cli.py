@@ -540,6 +540,13 @@ def embed(
     rebuild: Annotated[bool, typer.Option("--rebuild", help="Regenerate all embeddings")] = False,
 ) -> None:
     """Generate semantic embeddings for video titles and descriptions."""
+    from yt_brain.infrastructure.database import SQLITE_VEC_AVAILABLE
+
+    if not SQLITE_VEC_AVAILABLE:
+        console.print("[red]sqlite-vec is not installed. Embedding and clustering features are unavailable.[/red]")
+        console.print("[dim]Install with: uv sync  (or pip install sqlite-vec)[/dim]")
+        raise typer.Exit(1)
+
     from yt_brain.application.embed import embed_videos
     from yt_brain.infrastructure.database import get_embedding_count, get_videos_for_embedding
 
@@ -576,6 +583,13 @@ def cluster_default(
     """Run video clustering (incremental by default, --rebuild for full)."""
     if ctx.invoked_subcommand is not None:
         return
+
+    from yt_brain.infrastructure.database import SQLITE_VEC_AVAILABLE
+
+    if not SQLITE_VEC_AVAILABLE:
+        console.print("[red]sqlite-vec is not installed. Embedding and clustering features are unavailable.[/red]")
+        console.print("[dim]Install with: uv sync  (or pip install sqlite-vec)[/dim]")
+        raise typer.Exit(1)
 
     from yt_brain.infrastructure.config import load_config
     from yt_brain.infrastructure.database import get_embedding_count
