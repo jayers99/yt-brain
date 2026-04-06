@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from yt_brain.domain.models import Video
 from yt_brain.infrastructure.database import save_video
@@ -39,7 +39,8 @@ def test_backfill_channels_scoped_to_video_ids(temp_db):
 
 
 def test_fetch_liked_ids(temp_db):
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
     from yt_brain.infrastructure.ytdlp_adapter import fetch_liked_ids
 
     fake_output = "abc123\ndef456\nghi789\n"

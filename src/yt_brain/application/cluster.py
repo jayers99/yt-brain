@@ -8,18 +8,18 @@ from pathlib import Path
 import numpy as np
 
 from yt_brain.application.embed import EMBEDDING_DIM
+from yt_brain.domain.models import Cluster
 from yt_brain.infrastructure.database import (
     bulk_assign_clusters,
     delete_all_clusters,
     get_all_embeddings,
-    get_clusters_with_counts,
     get_cluster_by_slug,
+    get_clusters_with_counts,
     get_embeddings_for_ids,
     get_unassigned_video_ids,
     save_cluster,
     update_cluster_categories,
 )
-from yt_brain.domain.models import Cluster
 
 ASSIGNMENT_THRESHOLD = 0.5  # Max cosine distance for incremental assignment
 DEFAULT_MIN_CLUSTER_SIZE = 5
@@ -37,7 +37,8 @@ def _array_to_blob(arr: np.ndarray) -> bytes:
 
 def _compute_centroid(vectors: np.ndarray) -> np.ndarray:
     """Compute the mean of a set of vectors."""
-    return vectors.mean(axis=0)
+    result: np.ndarray = vectors.mean(axis=0)
+    return result
 
 
 def _cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
@@ -46,7 +47,7 @@ def _cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
     norm = np.linalg.norm(a) * np.linalg.norm(b)
     if norm == 0:
         return 1.0
-    return 1.0 - dot / norm
+    return float(1.0 - dot / norm)
 
 
 def _slugify(text: str) -> str:
@@ -83,7 +84,7 @@ def _call_claude_for_label(titles: list[str], api_key: str) -> str:
     if len(label.split()) > 6 or len(label) > 60 or not label:
         raise ValueError(f"Bad label response: {label[:80]}")
 
-    return label
+    return str(label)
 
 
 def _generate_slug(
@@ -130,8 +131,9 @@ def _generate_parent_categories(slugs: list[str], api_key: str) -> dict[str, str
     if not api_key:
         return {s: "Other" for s in slugs}
 
-    import anthropic
     import json
+
+    import anthropic
 
     client = anthropic.Anthropic(api_key=api_key)
     slug_set = set(slugs)
@@ -195,7 +197,7 @@ def cluster_videos(
 
     Returns the number of clusters created.
     """
-    import hdbscan
+    import hdbscan  # type: ignore[import-untyped]
 
     raw = get_all_embeddings(db_path)
     if len(raw) < 10:

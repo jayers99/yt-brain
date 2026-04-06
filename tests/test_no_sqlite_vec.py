@@ -79,60 +79,53 @@ class TestVecFunctionsRaiseWithoutVec:
     """Vec-dependent functions should raise DatabaseError with a clear message."""
 
     def test_get_videos_for_embedding_raises(self, db_no_vec: Path):
-        from yt_brain.infrastructure.database import get_videos_for_embedding
         from yt_brain.domain.errors import DatabaseError
+        from yt_brain.infrastructure.database import get_videos_for_embedding
 
-        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
-            with pytest.raises(DatabaseError, match="sqlite-vec"):
-                get_videos_for_embedding(db_no_vec)
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False), pytest.raises(DatabaseError, match="sqlite-vec"):
+            get_videos_for_embedding(db_no_vec)
 
     def test_insert_embeddings_raises(self, db_no_vec: Path):
-        from yt_brain.infrastructure.database import insert_embeddings
         from yt_brain.domain.errors import DatabaseError
+        from yt_brain.infrastructure.database import insert_embeddings
 
-        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
-            with pytest.raises(DatabaseError, match="sqlite-vec"):
-                insert_embeddings(db_no_vec, [])
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False), pytest.raises(DatabaseError, match="sqlite-vec"):
+            insert_embeddings(db_no_vec, [])
 
     def test_search_similar_raises(self, db_no_vec: Path):
-        from yt_brain.infrastructure.database import search_similar
         from yt_brain.domain.errors import DatabaseError
+        from yt_brain.infrastructure.database import search_similar
 
-        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
-            with pytest.raises(DatabaseError, match="sqlite-vec"):
-                search_similar(db_no_vec, b"\x00" * 384, limit=10)
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False), pytest.raises(DatabaseError, match="sqlite-vec"):
+            search_similar(db_no_vec, b"\x00" * 384, limit=10)
 
     def test_get_embedding_count_raises(self, db_no_vec: Path):
-        from yt_brain.infrastructure.database import get_embedding_count
         from yt_brain.domain.errors import DatabaseError
+        from yt_brain.infrastructure.database import get_embedding_count
 
-        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
-            with pytest.raises(DatabaseError, match="sqlite-vec"):
-                get_embedding_count(db_no_vec)
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False), pytest.raises(DatabaseError, match="sqlite-vec"):
+            get_embedding_count(db_no_vec)
 
     def test_get_all_embeddings_raises(self, db_no_vec: Path):
-        from yt_brain.infrastructure.database import get_all_embeddings
         from yt_brain.domain.errors import DatabaseError
+        from yt_brain.infrastructure.database import get_all_embeddings
 
-        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
-            with pytest.raises(DatabaseError, match="sqlite-vec"):
-                get_all_embeddings(db_no_vec)
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False), pytest.raises(DatabaseError, match="sqlite-vec"):
+            get_all_embeddings(db_no_vec)
 
     def test_get_unassigned_video_ids_raises(self, db_no_vec: Path):
-        from yt_brain.infrastructure.database import get_unassigned_video_ids
         from yt_brain.domain.errors import DatabaseError
+        from yt_brain.infrastructure.database import get_unassigned_video_ids
 
-        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
-            with pytest.raises(DatabaseError, match="sqlite-vec"):
-                get_unassigned_video_ids(db_no_vec)
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False), pytest.raises(DatabaseError, match="sqlite-vec"):
+            get_unassigned_video_ids(db_no_vec)
 
     def test_get_embeddings_for_ids_raises(self, db_no_vec: Path):
-        from yt_brain.infrastructure.database import get_embeddings_for_ids
         from yt_brain.domain.errors import DatabaseError
+        from yt_brain.infrastructure.database import get_embeddings_for_ids
 
-        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
-            with pytest.raises(DatabaseError, match="sqlite-vec"):
-                get_embeddings_for_ids(db_no_vec, ["abc"])
+        with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False), pytest.raises(DatabaseError, match="sqlite-vec"):
+            get_embeddings_for_ids(db_no_vec, ["abc"])
 
 
 class TestDashboardSearchFallback:
@@ -140,8 +133,8 @@ class TestDashboardSearchFallback:
 
     def test_search_fallback_to_like(self, temp_db: Path):
         """When embed_model not loaded, search should use text fallback."""
-        from yt_brain.infrastructure.database import save_video
         from yt_brain.domain.models import EngagementLevel, Source, Video
+        from yt_brain.infrastructure.database import save_video
 
         # Insert a test video
         video = Video(
@@ -190,6 +183,7 @@ class TestCliEarlyGuards:
 
     def test_embed_exits_without_sqlite_vec(self):
         from typer.testing import CliRunner
+
         from yt_brain.cli import app
 
         runner = CliRunner()
@@ -200,6 +194,7 @@ class TestCliEarlyGuards:
 
     def test_cluster_exits_without_sqlite_vec(self):
         from typer.testing import CliRunner
+
         from yt_brain.cli import app
 
         runner = CliRunner()

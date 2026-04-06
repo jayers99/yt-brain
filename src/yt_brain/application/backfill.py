@@ -6,7 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from urllib.error import URLError
 
-from yt_brain.infrastructure.ytdlp_adapter import fetch_liked_ids
 from yt_brain.infrastructure.database import (
     bulk_update_liked,
     get_all_video_ids,
@@ -20,6 +19,7 @@ from yt_brain.infrastructure.database import (
     update_published_at,
     update_watched_at,
 )
+from yt_brain.infrastructure.ytdlp_adapter import fetch_liked_ids
 
 YOUTUBE_CATEGORIES = {
     "1": "Film & Animation", "2": "Autos & Vehicles", "10": "Music",

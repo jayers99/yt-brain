@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-
 import pytest
 import yaml
 
-
-from yt_brain.infrastructure.config import YtBrainConfig, load_config, require_api_key
 from yt_brain.domain.errors import ConfigError
+from yt_brain.infrastructure.config import YtBrainConfig, load_config, require_api_key
 
 
 @pytest.fixture(autouse=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 from typing import Annotated
 
@@ -243,7 +244,7 @@ def fetch(
     import json as _json
     import re
     import urllib.request
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from urllib.error import URLError
 
     from yt_brain.infrastructure.config import load_config as _load_config
@@ -261,7 +262,7 @@ def fetch(
         raise typer.Exit(1)
 
     years = int(match.group(1))
-    cutoff = datetime.now(timezone.utc) - timedelta(days=years * 365)
+    cutoff = datetime.now(UTC) - timedelta(days=years * 365)
     console.print(f"[dim]Fetching watch history back to {cutoff.strftime('%b %Y')}...[/dim]")
 
     config = _load_config()
@@ -699,7 +700,9 @@ def backfill_descriptions(
         return
 
     target = min(missing_count, limit) if limit else missing_count
-    console.print(f"[dim]Backfilling descriptions for {target}/{missing_count} videos via YouTube API (batches of 50)...[/dim]")
+    console.print(
+        f"[dim]Backfilling descriptions for {target}/{missing_count} videos via YouTube API (batches of 50)...[/dim]"
+    )
 
     def on_progress(done: int, total: int) -> None:
         console.print(f"  [dim]{done}/{total}[/dim]")

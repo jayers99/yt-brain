@@ -1,16 +1,18 @@
 import struct
 from pathlib import Path
 
+from typer.testing import CliRunner
 
+from yt_brain.cli import app as cli_app
+from yt_brain.domain.models import Cluster, EngagementLevel, Source, Video
 from yt_brain.infrastructure.database import (
-    save_video,
-    save_cluster,
-    get_cluster_by_slug,
     assign_video_to_cluster,
+    get_cluster_by_slug,
     get_clusters_with_counts,
     get_video_cluster_slug,
+    save_cluster,
+    save_video,
 )
-from yt_brain.domain.models import Cluster, EngagementLevel, Source, Video
 
 
 def _make_video(youtube_id: str, title: str = "Test", channel: str = "ch") -> Video:
@@ -68,9 +70,6 @@ def test_video_with_no_cluster_returns_none(temp_db: Path) -> None:
     slug = get_video_cluster_slug(temp_db, "vid1")
     assert slug is None
 
-
-from typer.testing import CliRunner
-from yt_brain.cli import app as cli_app
 
 runner = CliRunner()
 

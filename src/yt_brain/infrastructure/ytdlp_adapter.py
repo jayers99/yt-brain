@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from yt_brain.domain.errors import IngestError
@@ -69,7 +70,7 @@ def fetch_transcript(video_id: str, language: str = "en") -> str | None:
 def fetch_history(
     limit: int = 20,
     browser: str = "chrome",
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Fetch YouTube watch history via yt-dlp using browser cookies."""
     try:
         result = subprocess.run(
@@ -102,7 +103,7 @@ def fetch_history_range(
     start: int,
     end: int,
     browser: str = "chrome",
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Fetch a specific range of YouTube watch history entries."""
     try:
         result = subprocess.run(
@@ -155,7 +156,7 @@ def fetch_liked_ids(browser: str = "chrome") -> list[str]:
     return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
 
 
-def parse_ytdlp_metadata(metadata: dict) -> Video:
+def parse_ytdlp_metadata(metadata: dict[str, Any]) -> Video:
     return Video(
         youtube_id=metadata.get("id", ""),
         title=metadata.get("title") or "",
@@ -167,7 +168,7 @@ def parse_ytdlp_metadata(metadata: dict) -> Video:
     )
 
 
-def _extract_text_from_subs(sub_data: list[dict]) -> str:
+def _extract_text_from_subs(sub_data: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for event in sub_data:
         text = event.get("text", "").strip()

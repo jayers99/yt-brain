@@ -8,6 +8,23 @@ import sqlite3
 from collections import Counter
 from pathlib import Path
 
+from flask import Flask, Response, jsonify, render_template_string, request, send_from_directory
+
+from yt_brain.domain.models import Video
+from yt_brain.infrastructure.config import load_config
+from yt_brain.infrastructure.database import (
+    SQLITE_VEC_AVAILABLE,
+    get_all_videos,
+    get_channel_urls,
+    get_embedding_count,
+    get_starred_channels,
+    init_db,
+    search_similar,
+    toggle_starred_channel,
+)
+
+from .classifier import classify_genre, genre_stats
+
 _EMOJI_RE = re.compile(
     "["
     "\U0001f600-\U0001f64f"  # emoticons
@@ -27,23 +44,6 @@ _EMOJI_RE = re.compile(
     "]+",
     flags=re.UNICODE,
 )
-
-from flask import Flask, jsonify, render_template_string, request, send_from_directory
-
-from yt_brain.domain.models import Video
-from yt_brain.infrastructure.config import load_config
-from yt_brain.infrastructure.database import (
-    SQLITE_VEC_AVAILABLE,
-    get_all_videos,
-    get_channel_urls,
-    get_embedding_count,
-    get_starred_channels,
-    init_db,
-    search_similar,
-    toggle_starred_channel,
-)
-
-from .classifier import classify_genre, genre_stats
 
 
 def is_removed_video(video: Video) -> bool:
@@ -1445,7 +1445,7 @@ GENRE_COLORS = {
 }
 
 
-def _text_search(db_path: Path, query: str, limit: int) -> tuple:
+def _text_search(db_path: Path, query: str, limit: int) -> tuple[object, int]:
     """Fall back to SQL LIKE search when sqlite-vec is unavailable."""
     conn = sqlite3.connect(db_path)
     try:
@@ -1616,7 +1616,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/images/<path:filename>")
-    def serve_image(filename: str):
+    def serve_image(filename: str) -> Response:
         images_dir = Path(__file__).parent / "static" / "images"
         return send_from_directory(images_dir, filename)
 
@@ -1699,11 +1699,7 @@ def create_app() -> Flask:
 
                     ok = True
                     for field, term in field_filters:
-                        if field == "title" and term not in title_l:
-                            ok = False
-                        elif field == "desc" and term not in desc_l:
-                            ok = False
-                        elif field == "channel" and term not in channel_l:
+                        if field == "title" and term not in title_l or field == "desc" and term not in desc_l or field == "channel" and term not in channel_l:
                             ok = False
                     for term in bare_quotes:
                         if term not in title_l and term not in desc_l:

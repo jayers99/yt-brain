@@ -4,13 +4,14 @@ import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from yt_brain.domain.errors import DatabaseError
 from yt_brain.domain.models import Cluster, EngagementLevel, Source, Video
 
 # Detect sqlite-vec availability at import time.
 try:
-    import sqlite_vec as _sqlite_vec  # noqa: F401
+    import sqlite_vec as _sqlite_vec  # type: ignore[import-untyped]  # noqa: F401
 
     SQLITE_VEC_AVAILABLE = True
 except ImportError:
@@ -516,7 +517,7 @@ def get_video_cluster_slug(db_path: Path, youtube_id: str) -> str | None:
         conn.close()
 
 
-def get_clusters_with_counts(db_path: Path) -> list[dict]:
+def get_clusters_with_counts(db_path: Path) -> list[dict[str, Any]]:
     conn = sqlite3.connect(db_path)
     try:
         rows = conn.execute(
@@ -626,7 +627,7 @@ def update_cluster_categories(db_path: Path, categories: dict[str, str]) -> None
         conn.close()
 
 
-def get_clusters_by_category(db_path: Path) -> list[dict]:
+def get_clusters_by_category(db_path: Path) -> list[dict[str, object]]:
     """Return clusters grouped by parent_category with counts."""
     conn = sqlite3.connect(db_path)
     try:
@@ -669,5 +670,5 @@ def _row_to_video(row: sqlite3.Row) -> Video:
         transcript=row["transcript"],
         tags=json.loads(row["tags"]),
         source=Source(row["source"]),
-        category=row["category"] if "category" in row.keys() else "",
+        category=row["category"] if "category" in row.keys() else "",  # noqa: SIM118
     )

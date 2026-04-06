@@ -46,7 +46,7 @@ def embed_videos(
 
         embeddings = model.encode(texts, show_progress_bar=False)
 
-        rows = [(vid_id, _to_blob(emb.tolist())) for vid_id, emb in zip(ids, embeddings)]
+        rows = [(vid_id, _to_blob(emb.tolist())) for vid_id, emb in zip(ids, embeddings, strict=True)]
         insert_embeddings(db_path, rows)
 
         embedded += len(batch)

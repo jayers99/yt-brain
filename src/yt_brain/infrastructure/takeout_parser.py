@@ -4,6 +4,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from yt_brain.domain.errors import IngestError
@@ -43,7 +44,7 @@ def parse_liked_videos(filepath: Path) -> list[str]:
     return video_ids
 
 
-def _parse_watch_entry(entry: dict) -> Video | None:
+def _parse_watch_entry(entry: dict[str, Any]) -> Video | None:
     title_url = entry.get("titleUrl", "")
     if not title_url or "watch?v=" not in title_url:
         return None

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-
+from typing import Any
 
 RULES: list[tuple[str, list[str]]] = [
     ("AI/ML & LLMs", [
@@ -96,13 +96,13 @@ def classify_genre(title: str) -> str:
     return "Other"
 
 
-def classify_videos(videos: list[dict]) -> list[dict]:
+def classify_videos(videos: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for v in videos:
         v["genre"] = classify_genre(v.get("title", ""))
     return videos
 
 
-def genre_stats(videos: list[dict]) -> list[dict]:
+def genre_stats(videos: list[dict[str, Any]]) -> list[dict[str, Any]]:
     counts = Counter(v.get("genre", "Other") for v in videos)
     total = len(videos)
     stats = []
