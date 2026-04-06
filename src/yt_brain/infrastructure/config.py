@@ -15,7 +15,6 @@ class YtBrainConfig:
     config_dir: Path = field(default_factory=lambda: DEFAULT_CONFIG_DIR)
     youtube_api_key: str = ""
     anthropic_api_key: str = ""
-    oauth_credentials: Path = field(default_factory=lambda: DEFAULT_CONFIG_DIR / "oauth.json")
     bounce_threshold: float = 0.15
     watched_threshold: float = 0.85
     transcript_language: str = "en"
@@ -50,8 +49,6 @@ def load_config() -> YtBrainConfig:
             config.youtube_api_key = data["youtube_api_key"]
         if "anthropic_api_key" in data:
             config.anthropic_api_key = data["anthropic_api_key"]
-        if "oauth_credentials" in data:
-            config.oauth_credentials = Path(data["oauth_credentials"])
         if "thresholds" in data:
             thresholds = data["thresholds"]
             if "bounced_below" in thresholds:
@@ -61,7 +58,34 @@ def load_config() -> YtBrainConfig:
         if "transcript_language" in data:
             config.transcript_language = data["transcript_language"]
 
+    # Environment variables override config file
+    env_yt = os.environ.get("YOUTUBE_API_KEY")
+    if env_yt:
+        config.youtube_api_key = env_yt
+    env_ant = os.environ.get("ANTHROPIC_API_KEY")
+    if env_ant:
+        config.anthropic_api_key = env_ant
+
     return config
+
+
+def require_api_key(config: YtBrainConfig, key_name: str) -> str:
+    """Get a required API key or raise ConfigError with setup instructions."""
+    from yt_brain.domain.errors import ConfigError
+
+    value = getattr(config, key_name, "")
+    if not value:
+        env_var = {
+            "youtube_api_key": "YOUTUBE_API_KEY",
+            "anthropic_api_key": "ANTHROPIC_API_KEY",
+        }.get(key_name, key_name.upper())
+
+        raise ConfigError(
+            f"Missing {key_name}. Set it via:\n"
+            f"  1. Environment variable: export {env_var}=<your-key>\n"
+            f"  2. Config file: {config.config_file}"
+        )
+    return value
 
 
 def save_config(config: YtBrainConfig) -> None:
@@ -69,7 +93,6 @@ def save_config(config: YtBrainConfig) -> None:
     data = {
         "youtube_api_key": config.youtube_api_key,
         "anthropic_api_key": config.anthropic_api_key,
-        "oauth_credentials": str(config.oauth_credentials),
         "thresholds": {
             "bounced_below": config.bounce_threshold,
             "watched_above": config.watched_threshold,

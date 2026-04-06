@@ -92,11 +92,13 @@ def _generate_slug(
     fallback_index: int = 0,
 ) -> str:
     """Generate a unique slug for a cluster using Claude API with fallback."""
-    try:
-        label = _call_claude_for_label(titles, api_key)
-        slug = _slugify(label)
-    except Exception:
-        slug = f"cluster-{fallback_index:02d}"
+    slug = f"cluster-{fallback_index:02d}"
+    if api_key:
+        try:
+            label = _call_claude_for_label(titles, api_key)
+            slug = _slugify(label)
+        except Exception:
+            pass
 
     if slug not in existing_slugs:
         return slug
@@ -124,6 +126,9 @@ def _generate_parent_categories(slugs: list[str], api_key: str) -> dict[str, str
 
     Batches slugs to avoid output truncation. Returns {slug: parent_category_name}.
     """
+    if not api_key:
+        return {s: "Other" for s in slugs}
+
     import anthropic
     import json
 

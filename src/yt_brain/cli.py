@@ -503,7 +503,6 @@ def config() -> None:
     table.add_row("Config dir", str(cfg.config_dir))
     table.add_row("Database", str(cfg.db_path))
     table.add_row("API key", "***" if cfg.youtube_api_key else "(not set)")
-    table.add_row("OAuth credentials", str(cfg.oauth_credentials))
     table.add_row("Bounce threshold", f"{cfg.bounce_threshold:.0%}")
     table.add_row("Watched threshold", f"{cfg.watched_threshold:.0%}")
     table.add_row("Transcript language", cfg.transcript_language)
