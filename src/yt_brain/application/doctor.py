@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sqlite3
 import subprocess
 import urllib.error
 import urllib.request
@@ -52,16 +54,14 @@ def check_youtube_api_key(api_key: str) -> CheckResult:
     url = f"https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key={api_key}"
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
-            import json
-
             data = json.loads(resp.read())
         if data.get("items"):
             return CheckResult("YouTube API key", CheckStatus.OK, "valid")
         return CheckResult("YouTube API key", CheckStatus.FAIL, "key accepted but no items returned")
     except urllib.error.HTTPError as exc:
         return CheckResult("YouTube API key", CheckStatus.FAIL, f"HTTP {exc.code}: {exc.reason}")
-    except Exception as exc:  # noqa: BLE001
-        return CheckResult("YouTube API key", CheckStatus.FAIL, str(exc))
+    except Exception:  # noqa: BLE001
+        return CheckResult("YouTube API key", CheckStatus.FAIL, "configured but validation failed")
 
 
 def check_anthropic_api_key(api_key: str) -> CheckResult:
@@ -83,8 +83,6 @@ def check_browser_cookies() -> CheckResult:
 
 
 def check_database(db_path: Path) -> CheckResult:
-    import sqlite3
-
     if not db_path.exists():
         return CheckResult("database", CheckStatus.INFO, "no database yet")
 
@@ -114,5 +112,7 @@ def check_database(db_path: Path) -> CheckResult:
             parts.append(f"{cluster_count:,} clusters")
 
         return CheckResult("database", CheckStatus.INFO, " | ".join(parts))
+    except sqlite3.OperationalError:
+        return CheckResult("database", CheckStatus.WARN, "database exists but schema is missing or corrupt")
     finally:
         conn.close()

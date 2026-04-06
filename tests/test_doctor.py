@@ -107,6 +107,13 @@ class TestCheckYoutubeApiKey:
         result = check_youtube_api_key("")
         assert result.name == "YouTube API key"
 
+    def test_error_detail_does_not_leak_api_key(self):
+        secret = "super-secret-api-key-12345"
+        with patch("urllib.request.urlopen", side_effect=Exception(f"https://googleapis.com/...&key={secret}")):
+            result = check_youtube_api_key(secret)
+        assert result.status == CheckStatus.FAIL
+        assert secret not in result.detail
+
 
 class TestCheckAnthropicApiKey:
     def test_warn_when_empty(self):
@@ -180,6 +187,16 @@ class TestCheckDatabase:
     def test_name(self, temp_db: Path):
         result = check_database(temp_db)
         assert result.name == "database"
+
+    def test_warn_when_db_exists_but_no_schema(self, tmp_path: Path):
+        # Create a db file with no tables (empty/corrupt schema)
+        db_path = tmp_path / "empty.db"
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(db_path)
+        conn.close()
+        result = check_database(db_path)
+        assert result.status == CheckStatus.WARN
+        assert "corrupt" in result.detail or "missing" in result.detail
 
     def test_large_counts_formatted_with_commas(self, temp_db: Path):
         conn = sqlite3.connect(temp_db)
