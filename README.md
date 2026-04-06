@@ -6,7 +6,7 @@ Turn passive YouTube watching into active knowledge.
 
 yt-brain ingests your YouTube watch history, classifies videos by genre and channel, and provides an interactive dashboard to explore your viewing patterns.
 
-![yt-brain Dashboard](docs/app_screen_shot.png)
+![yt-brain Dashboard](docs/app_screen_shot.jpg)
 
 ## Features
 
@@ -27,23 +27,23 @@ pip install yt-brain
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `ingest takeout <path>` | Import from Google Takeout (zip or directory) |
-| `ingest video <url>` | Add a single video by URL |
-| `sync [--browser chrome]` | Fetch and add new videos since last sync |
-| `embed [--rebuild]` | Generate semantic embeddings for search |
-| `cluster [--rebuild]` | Run topic clustering on embedded videos |
-| `dashboard [--port 5555]` | Launch web dashboard |
-| `doctor` | Check that prerequisites are installed and configured |
-| `status` | Show video counts by engagement tier |
-| `classify` | Run engagement classification |
-| `backfill-channels` | Fill missing channel names |
-| `backfill-categories` | Fill missing categories (needs API key) |
-| `backfill-dates` | Fill missing dates (needs API key) |
-| `backfill-descriptions` | Fill missing descriptions (needs API key) |
-| `transcript <video_id>` | Fetch transcript via yt-dlp |
-| `config` | Show current configuration |
+| Command                   | Description                                           |
+| ------------------------- | ----------------------------------------------------- |
+| `ingest takeout <path>`   | Import from Google Takeout (zip or directory)         |
+| `ingest video <url>`      | Add a single video by URL                             |
+| `sync [--browser chrome]` | Fetch and add new videos since last sync              |
+| `embed [--rebuild]`       | Generate semantic embeddings for search               |
+| `cluster [--rebuild]`     | Run topic clustering on embedded videos               |
+| `dashboard [--port 5555]` | Launch web dashboard                                  |
+| `doctor`                  | Check that prerequisites are installed and configured |
+| `status`                  | Show video counts by engagement tier                  |
+| `classify`                | Run engagement classification                         |
+| `backfill-channels`       | Fill missing channel names                            |
+| `backfill-categories`     | Fill missing categories (needs API key)               |
+| `backfill-dates`          | Fill missing dates (needs API key)                    |
+| `backfill-descriptions`   | Fill missing descriptions (needs API key)             |
+| `transcript <video_id>`   | Fetch transcript via yt-dlp                           |
+| `config`                  | Show current configuration                            |
 
 ## Dashboard
 
@@ -57,13 +57,13 @@ The web dashboard provides:
 
 ### Search Syntax
 
-| Query | Behavior |
-|-------|----------|
-| `machine learning` | Semantic search — finds related videos by meaning |
-| `"kubernetes"` | Semantic + exact match on "kubernetes" in title or description |
-| `title:"Claude"` | Exact match in title only (case-insensitive) |
-| `desc:"tutorial"` | Exact match in description only |
-| `channel:"3Blue1Brown"` | Exact match in channel name |
+| Query                      | Behavior                                                                |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `machine learning`         | Semantic search — finds related videos by meaning                       |
+| `"kubernetes"`             | Semantic + exact match on "kubernetes" in title or description          |
+| `title:"Claude"`           | Exact match in title only (case-insensitive)                            |
+| `desc:"tutorial"`          | Exact match in description only                                         |
+| `channel:"3Blue1Brown"`    | Exact match in channel name                                             |
 | `AI agents title:"python"` | Semantic search for "AI agents", filtered to titles containing "python" |
 
 ## Architecture
