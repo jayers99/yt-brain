@@ -52,14 +52,16 @@ def init_db(db_path: Path) -> None:
             sql = (migrations_dir / "001_initial_schema.sql").read_text()
             conn.executescript(sql)
 
-        # Run any pending migrations
-        cursor = conn.execute("SELECT MAX(version) FROM schema_version")
-        current_version = cursor.fetchone()[0] or 0
+        # Run any pending migrations (track as set to handle skipped vec migrations)
+        applied = {
+            row[0]
+            for row in conn.execute("SELECT version FROM schema_version").fetchall()
+        }
 
         for mig_file in sorted(migrations_dir.glob("*.sql")):
             # Extract version number from filename (e.g., 002_starred_channels.sql -> 2)
             version = int(mig_file.name.split("_")[0])
-            if version > current_version:
+            if version not in applied:
                 if version in _VEC_MIGRATIONS:
                     if not SQLITE_VEC_AVAILABLE:
                         continue  # Skip vec migrations gracefully
@@ -472,7 +474,10 @@ def save_cluster(db_path: Path, cluster: Cluster) -> int:
             (cluster.slug, cluster.centroid),
         )
         conn.commit()
-        return cursor.lastrowid or 0
+        cluster_id = cursor.lastrowid
+        if cluster_id is None:
+            raise DatabaseError("Failed to retrieve cluster_id after insert.")
+        return cluster_id
     finally:
         conn.close()
 

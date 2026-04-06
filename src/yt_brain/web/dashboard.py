@@ -1445,7 +1445,7 @@ GENRE_COLORS = {
 }
 
 
-def _text_search(db_path: Path, query: str, limit: int) -> tuple[object, int]:
+def _text_search(db_path: Path, query: str, limit: int) -> tuple[Response, int]:
     """Fall back to SQL LIKE search when sqlite-vec is unavailable."""
     conn = sqlite3.connect(db_path)
     try:
@@ -1585,7 +1585,10 @@ def create_app() -> Flask:
             count = sum(1 for v in videos if lo <= (v["duration"] or 0) < hi)
             duration_buckets.append({"label": label, "count": count})
 
-        has_embeddings = get_embedding_count(config.db_path) > 0
+        try:
+            has_embeddings = SQLITE_VEC_AVAILABLE and get_embedding_count(config.db_path) > 0
+        except Exception:
+            has_embeddings = False
         clustered_count = sum(1 for v in videos if v["cluster"])
         clustered_pct = round(clustered_count / total * 100) if total else 0
 
