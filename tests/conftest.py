@@ -6,6 +6,13 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _clear_api_keys(monkeypatch):
+    """Ensure no real API keys leak into tests."""
+    monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+
 @pytest.fixture
 def temp_config_dir() -> Generator[Path, None, None]:
     with tempfile.TemporaryDirectory() as tmpdir:
