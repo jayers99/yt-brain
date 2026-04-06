@@ -1,3 +1,5 @@
+[![CI](https://github.com/jayers99/yt-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/jayers99/yt-brain/actions/workflows/ci.yml)
+
 # yt-brain
 
 Turn passive YouTube watching into active knowledge.
