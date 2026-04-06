@@ -35,7 +35,7 @@ pip install yt-brain
 | `embed [--rebuild]`       | Generate semantic embeddings for search               |
 | `cluster [--rebuild]`     | Run topic clustering on embedded videos               |
 | `dashboard [--port 5555]` | Launch web dashboard                                  |
-| `doctor`                  | Check that prerequisites are installed and configured |
+| `surgeon`                 | Check that prerequisites are installed and configured |
 | `status`                  | Show video counts by engagement tier                  |
 | `classify`                | Run engagement classification                         |
 | `backfill-channels`       | Fill missing channel names                            |

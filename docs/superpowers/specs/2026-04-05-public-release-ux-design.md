@@ -15,9 +15,9 @@ The goal: make yt-brain installable from PyPI (`pip install yt-brain` / `uvx yt-
 - **Dependencies stay in core** — sentence-transformers, sqlite-vec, hdbscan remain in `dependencies`. Semantic search is the killer feature; splitting it out defeats the purpose.
 - **sqlite-vec is soft at runtime** — if the native extension fails to load, features degrade gracefully (already partially implemented in dashboard). This prevents install failures on unsupported platforms from blocking the entire app.
 - **README is a landing page**, not a setup guide. INSTALL.md is the single source of truth for getting the app working.
-- **Sequencing: code first, then docs** — ship `yt-brain doctor` and PyPI publishing before rewriting docs, so docs describe reality.
+- **Sequencing: code first, then docs** — ship `yt-brain surgeon` and PyPI publishing before rewriting docs, so docs describe reality.
 
-## Phase 1: `yt-brain doctor`
+## Phase 1: `yt-brain surgeon`
 
 New CLI command that checks each prerequisite and reports status.
 
@@ -35,7 +35,7 @@ New CLI command that checks each prerequisite and reports status.
 ### Output format
 
 ```
-$ yt-brain doctor
+$ yt-brain surgeon
 
 yt-brain prerequisites check
 ------------------------------
@@ -57,7 +57,7 @@ yt-brain prerequisites check
 
 ### Implementation location
 
-- New file: `src/yt_brain/application/doctor.py` — check logic
+- New file: `src/yt_brain/application/surgeon.py` — check logic
 - CLI command registered in `src/yt_brain/cli.py`
 
 ## Phase 2: PyPI Publishing
@@ -146,7 +146,7 @@ WARNING HEADER: yt-brain requires external services and API keys.
       - JSON format reminder
 
 4. Verify setup
-   yt-brain doctor
+   yt-brain surgeon
    - Explain what each check means
    - Link to Troubleshooting for failures
 
@@ -180,8 +180,8 @@ WARNING HEADER: yt-brain requires external services and API keys.
 
 | Phase | Scope | PR |
 |-------|-------|----|
-| 1 | `yt-brain doctor` command | Separate PR |
+| 1 | `yt-brain surgeon` command | Separate PR |
 | 2 | PyPI publishing (package metadata, soft deps, GH Actions workflow) | Separate PR |
 | 3 | README.md rewrite + INSTALL.md creation | Separate PR |
 
-Each phase is independently shippable. Phase 3 depends on phases 1 and 2 being merged so docs can reference `yt-brain doctor` and `pip install yt-brain` accurately.
+Each phase is independently shippable. Phase 3 depends on phases 1 and 2 being merged so docs can reference `yt-brain surgeon` and `pip install yt-brain` accurately.

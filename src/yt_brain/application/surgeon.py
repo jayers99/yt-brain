@@ -117,7 +117,7 @@ def check_database(db_path: Path) -> CheckResult:
         conn.close()
 
 
-def run_doctor(
+def run_surgeon(
     youtube_api_key: str,
     anthropic_api_key: str,
     db_path: Path,

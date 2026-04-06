@@ -93,10 +93,10 @@ You should see: `Ingested <N> videos from Takeout.` where N is typically hundred
 
 ## 4. Verify Setup
 
-Run the doctor command to check everything is configured:
+Run the surgeon command to check everything is configured:
 
 ```bash
-yt-brain doctor
+yt-brain surgeon
 ```
 
 All critical checks should show ✅. Fix any ❌ items using the instructions above.

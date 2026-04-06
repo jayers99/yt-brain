@@ -1,6 +1,6 @@
 [project]
 name = "yt-brain"
-version = "0.1.3"
+version = "0.1.4"
 description = "YouTube knowledge brain — ingest, classify, and curate your YouTube activity"
 authors = [{ name = "jayers99" }]
 readme = "README.md"

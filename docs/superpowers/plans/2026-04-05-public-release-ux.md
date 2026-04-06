@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make yt-brain easy to install from PyPI with a `yt-brain doctor` command for prerequisite verification, then rewrite docs so README is a landing page and INSTALL.md is the single setup guide.
+**Goal:** Make yt-brain easy to install from PyPI with a `yt-brain surgeon` command for prerequisite verification, then rewrite docs so README is a landing page and INSTALL.md is the single setup guide.
 
-**Architecture:** Three phases executed sequentially — (1) `yt-brain doctor` CLI command in application layer, (2) PyPI publishing via GitHub Actions with soft dependency handling, (3) README/INSTALL.md rewrite. Each phase is a separate PR.
+**Architecture:** Three phases executed sequentially — (1) `yt-brain surgeon` CLI command in application layer, (2) PyPI publishing via GitHub Actions with soft dependency handling, (3) README/INSTALL.md rewrite. Each phase is a separate PR.
 
 **Tech Stack:** Typer CLI, Rich console output, GitHub Actions (trusted publishing), hatchling build backend
 
@@ -14,9 +14,9 @@
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src/yt_brain/application/doctor.py` | Create | Prerequisite check logic |
-| `tests/test_doctor.py` | Create | Tests for doctor command |
-| `src/yt_brain/cli.py` | Modify | Register `doctor` command |
+| `src/yt_brain/application/surgeon.py` | Create | Prerequisite check logic |
+| `tests/test_surgeon.py` | Create | Tests for surgeon command |
+| `src/yt_brain/cli.py` | Modify | Register `surgeon` command |
 | `pyproject.toml` | Modify | Add classifiers, project URLs, version bump |
 | `.github/workflows/publish.yml` | Create | PyPI publish on release |
 | `README.md` | Rewrite | Landing page only |
@@ -25,25 +25,25 @@
 
 ---
 
-## Phase 1: `yt-brain doctor`
+## Phase 1: `yt-brain surgeon`
 
-### Task 1: Doctor check infrastructure
+### Task 1: Surgeon check infrastructure
 
 **Files:**
-- Create: `src/yt_brain/application/doctor.py`
-- Create: `tests/test_doctor.py`
+- Create: `src/yt_brain/application/surgeon.py`
+- Create: `tests/test_surgeon.py`
 
 - [ ] **Step 1: Write the failing test for CheckResult model and `check_sqlite_vec`**
 
 ```python
-# tests/test_doctor.py
-"""Tests for yt-brain doctor prerequisite checks."""
+# tests/test_surgeon.py
+"""Tests for yt-brain surgeon prerequisite checks."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
-from yt_brain.application.doctor import CheckResult, CheckStatus, check_sqlite_vec
+from yt_brain.application.surgeon import CheckResult, CheckStatus, check_sqlite_vec
 
 
 class TestCheckResult:
@@ -60,27 +60,27 @@ class TestCheckResult:
 
 class TestCheckSqliteVec:
     def test_available(self):
-        with patch("yt_brain.application.doctor.SQLITE_VEC_AVAILABLE", True):
+        with patch("yt_brain.application.surgeon.SQLITE_VEC_AVAILABLE", True):
             result = check_sqlite_vec()
         assert result.status == CheckStatus.OK
         assert result.name == "sqlite-vec"
 
     def test_unavailable(self):
-        with patch("yt_brain.application.doctor.SQLITE_VEC_AVAILABLE", False):
+        with patch("yt_brain.application.surgeon.SQLITE_VEC_AVAILABLE", False):
             result = check_sqlite_vec()
         assert result.status == CheckStatus.FAIL
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/test_doctor.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'yt_brain.application.doctor'`
+Run: `uv run pytest tests/test_surgeon.py -v`
+Expected: FAIL — `ModuleNotFoundError: No module named 'yt_brain.application.surgeon'`
 
 - [ ] **Step 3: Implement CheckResult model and `check_sqlite_vec`**
 
 ```python
-# src/yt_brain/application/doctor.py
-"""Prerequisite checks for yt-brain doctor command."""
+# src/yt_brain/application/surgeon.py
+"""Prerequisite checks for yt-brain surgeon command."""
 
 from __future__ import annotations
 
@@ -116,35 +116,35 @@ def check_sqlite_vec() -> CheckResult:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/test_doctor.py -v`
+Run: `uv run pytest tests/test_surgeon.py -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/yt_brain/application/doctor.py tests/test_doctor.py
-git commit -m "Add doctor check infrastructure with sqlite-vec check"
+git add src/yt_brain/application/surgeon.py tests/test_surgeon.py
+git commit -m "Add surgeon check infrastructure with sqlite-vec check"
 ```
 
 ### Task 2: yt-dlp check
 
 **Files:**
-- Modify: `src/yt_brain/application/doctor.py`
-- Modify: `tests/test_doctor.py`
+- Modify: `src/yt_brain/application/surgeon.py`
+- Modify: `tests/test_surgeon.py`
 
 - [ ] **Step 1: Write the failing test for `check_ytdlp`**
 
 ```python
-# append to tests/test_doctor.py
+# append to tests/test_surgeon.py
 import subprocess
 
-from yt_brain.application.doctor import check_ytdlp
+from yt_brain.application.surgeon import check_ytdlp
 
 
 class TestCheckYtdlp:
     def test_installed(self):
         with patch(
-            "yt_brain.application.doctor.subprocess.run",
+            "yt_brain.application.surgeon.subprocess.run",
             return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
         ):
             result = check_ytdlp()
@@ -153,7 +153,7 @@ class TestCheckYtdlp:
 
     def test_not_installed(self):
         with patch(
-            "yt_brain.application.doctor.subprocess.run",
+            "yt_brain.application.surgeon.subprocess.run",
             side_effect=FileNotFoundError,
         ):
             result = check_ytdlp()
@@ -163,13 +163,13 @@ class TestCheckYtdlp:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckYtdlp -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckYtdlp -v`
 Expected: FAIL — `ImportError: cannot import name 'check_ytdlp'`
 
 - [ ] **Step 3: Implement `check_ytdlp`**
 
 ```python
-# add to src/yt_brain/application/doctor.py
+# add to src/yt_brain/application/surgeon.py
 import subprocess
 
 
@@ -191,30 +191,30 @@ def check_ytdlp() -> CheckResult:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckYtdlp -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckYtdlp -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/yt_brain/application/doctor.py tests/test_doctor.py
-git commit -m "Add yt-dlp check to doctor"
+git add src/yt_brain/application/surgeon.py tests/test_surgeon.py
+git commit -m "Add yt-dlp check to surgeon"
 ```
 
 ### Task 3: YouTube API key check
 
 **Files:**
-- Modify: `src/yt_brain/application/doctor.py`
-- Modify: `tests/test_doctor.py`
+- Modify: `src/yt_brain/application/surgeon.py`
+- Modify: `tests/test_surgeon.py`
 
 - [ ] **Step 1: Write the failing test for `check_youtube_api_key`**
 
 ```python
-# append to tests/test_doctor.py
+# append to tests/test_surgeon.py
 import json
 from unittest.mock import MagicMock
 
-from yt_brain.application.doctor import check_youtube_api_key
+from yt_brain.application.surgeon import check_youtube_api_key
 
 
 class TestCheckYoutubeApiKey:
@@ -228,14 +228,14 @@ class TestCheckYoutubeApiKey:
         mock_resp.read.return_value = json.dumps({"items": [{"id": "dQw4w9WgXcQ"}]}).encode()
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("yt_brain.application.doctor.urllib.request.urlopen", return_value=mock_resp):
+        with patch("yt_brain.application.surgeon.urllib.request.urlopen", return_value=mock_resp):
             result = check_youtube_api_key(api_key="fake-key")
         assert result.status == CheckStatus.OK
         assert "valid" in result.detail
 
     def test_configured_but_invalid(self):
         with patch(
-            "yt_brain.application.doctor.urllib.request.urlopen",
+            "yt_brain.application.surgeon.urllib.request.urlopen",
             side_effect=Exception("403 Forbidden"),
         ):
             result = check_youtube_api_key(api_key="bad-key")
@@ -245,13 +245,13 @@ class TestCheckYoutubeApiKey:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckYoutubeApiKey -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckYoutubeApiKey -v`
 Expected: FAIL — `ImportError: cannot import name 'check_youtube_api_key'`
 
 - [ ] **Step 3: Implement `check_youtube_api_key`**
 
 ```python
-# add to src/yt_brain/application/doctor.py
+# add to src/yt_brain/application/surgeon.py
 import json
 import urllib.request
 from urllib.error import URLError
@@ -280,27 +280,27 @@ def check_youtube_api_key(api_key: str) -> CheckResult:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckYoutubeApiKey -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckYoutubeApiKey -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/yt_brain/application/doctor.py tests/test_doctor.py
-git commit -m "Add YouTube API key check to doctor"
+git add src/yt_brain/application/surgeon.py tests/test_surgeon.py
+git commit -m "Add YouTube API key check to surgeon"
 ```
 
 ### Task 4: Anthropic API key check
 
 **Files:**
-- Modify: `src/yt_brain/application/doctor.py`
-- Modify: `tests/test_doctor.py`
+- Modify: `src/yt_brain/application/surgeon.py`
+- Modify: `tests/test_surgeon.py`
 
 - [ ] **Step 1: Write the failing test for `check_anthropic_api_key`**
 
 ```python
-# append to tests/test_doctor.py
-from yt_brain.application.doctor import check_anthropic_api_key
+# append to tests/test_surgeon.py
+from yt_brain.application.surgeon import check_anthropic_api_key
 
 
 class TestCheckAnthropicApiKey:
@@ -319,7 +319,7 @@ class TestCheckAnthropicApiKey:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckAnthropicApiKey -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckAnthropicApiKey -v`
 Expected: FAIL — `ImportError: cannot import name 'check_anthropic_api_key'`
 
 - [ ] **Step 3: Implement `check_anthropic_api_key`**
@@ -327,7 +327,7 @@ Expected: FAIL — `ImportError: cannot import name 'check_anthropic_api_key'`
 Note: Unlike YouTube API, we don't make a test call — Anthropic API calls cost money and this is a diagnostic command. Just verify the key is present.
 
 ```python
-# add to src/yt_brain/application/doctor.py
+# add to src/yt_brain/application/surgeon.py
 def check_anthropic_api_key(api_key: str) -> CheckResult:
     if not api_key:
         return CheckResult(
@@ -344,27 +344,27 @@ def check_anthropic_api_key(api_key: str) -> CheckResult:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckAnthropicApiKey -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckAnthropicApiKey -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/yt_brain/application/doctor.py tests/test_doctor.py
-git commit -m "Add Anthropic API key check to doctor"
+git add src/yt_brain/application/surgeon.py tests/test_surgeon.py
+git commit -m "Add Anthropic API key check to surgeon"
 ```
 
 ### Task 5: Browser cookies and database status checks
 
 **Files:**
-- Modify: `src/yt_brain/application/doctor.py`
-- Modify: `tests/test_doctor.py`
+- Modify: `src/yt_brain/application/surgeon.py`
+- Modify: `tests/test_surgeon.py`
 
 - [ ] **Step 1: Write the failing tests for `check_browser_cookies` and `check_database`**
 
 ```python
-# append to tests/test_doctor.py
-from yt_brain.application.doctor import check_browser_cookies, check_database
+# append to tests/test_surgeon.py
+from yt_brain.application.surgeon import check_browser_cookies, check_database
 
 
 class TestCheckBrowserCookies:
@@ -405,13 +405,13 @@ class TestCheckDatabase:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckBrowserCookies tests/test_doctor.py::TestCheckDatabase -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckBrowserCookies tests/test_surgeon.py::TestCheckDatabase -v`
 Expected: FAIL — `ImportError`
 
 - [ ] **Step 3: Implement both checks**
 
 ```python
-# add to src/yt_brain/application/doctor.py
+# add to src/yt_brain/application/surgeon.py
 import sqlite3
 from pathlib import Path
 
@@ -461,40 +461,40 @@ def check_database(db_path: Path) -> CheckResult:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/test_doctor.py::TestCheckBrowserCookies tests/test_doctor.py::TestCheckDatabase -v`
+Run: `uv run pytest tests/test_surgeon.py::TestCheckBrowserCookies tests/test_surgeon.py::TestCheckDatabase -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/yt_brain/application/doctor.py tests/test_doctor.py
-git commit -m "Add browser cookies and database checks to doctor"
+git add src/yt_brain/application/surgeon.py tests/test_surgeon.py
+git commit -m "Add browser cookies and database checks to surgeon"
 ```
 
-### Task 6: `run_doctor` orchestrator and CLI command
+### Task 6: `run_surgeon` orchestrator and CLI command
 
 **Files:**
-- Modify: `src/yt_brain/application/doctor.py`
+- Modify: `src/yt_brain/application/surgeon.py`
 - Modify: `src/yt_brain/cli.py`
-- Modify: `tests/test_doctor.py`
+- Modify: `tests/test_surgeon.py`
 
-- [ ] **Step 1: Write the failing test for `run_doctor`**
+- [ ] **Step 1: Write the failing test for `run_surgeon`**
 
 ```python
-# append to tests/test_doctor.py
-from yt_brain.application.doctor import run_doctor
+# append to tests/test_surgeon.py
+from yt_brain.application.surgeon import run_surgeon
 
 
-class TestRunDoctor:
+class TestRunSurgeon:
     def test_returns_all_checks(self, temp_db):
         with (
-            patch("yt_brain.application.doctor.SQLITE_VEC_AVAILABLE", True),
+            patch("yt_brain.application.surgeon.SQLITE_VEC_AVAILABLE", True),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
             ),
         ):
-            results = run_doctor(
+            results = run_surgeon(
                 youtube_api_key="",
                 anthropic_api_key="",
                 db_path=temp_db,
@@ -510,13 +510,13 @@ class TestRunDoctor:
 
     def test_has_failures_returns_true_when_fail(self, temp_db):
         with (
-            patch("yt_brain.application.doctor.SQLITE_VEC_AVAILABLE", False),
+            patch("yt_brain.application.surgeon.SQLITE_VEC_AVAILABLE", False),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 side_effect=FileNotFoundError,
             ),
         ):
-            results = run_doctor(
+            results = run_surgeon(
                 youtube_api_key="",
                 anthropic_api_key="",
                 db_path=temp_db,
@@ -527,14 +527,14 @@ class TestRunDoctor:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/test_doctor.py::TestRunDoctor -v`
-Expected: FAIL — `ImportError: cannot import name 'run_doctor'`
+Run: `uv run pytest tests/test_surgeon.py::TestRunSurgeon -v`
+Expected: FAIL — `ImportError: cannot import name 'run_surgeon'`
 
-- [ ] **Step 3: Implement `run_doctor`**
+- [ ] **Step 3: Implement `run_surgeon`**
 
 ```python
-# add to src/yt_brain/application/doctor.py
-def run_doctor(
+# add to src/yt_brain/application/surgeon.py
+def run_surgeon(
     youtube_api_key: str,
     anthropic_api_key: str,
     db_path: Path,
@@ -552,7 +552,7 @@ def run_doctor(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/test_doctor.py::TestRunDoctor -v`
+Run: `uv run pytest tests/test_surgeon.py::TestRunSurgeon -v`
 Expected: PASS
 
 - [ ] **Step 5: Register the CLI command**
@@ -561,15 +561,15 @@ Add to `src/yt_brain/cli.py`, after the `config` command (around line 510):
 
 ```python
 @app.command()
-def doctor() -> None:
+def surgeon() -> None:
     """Check that all prerequisites are installed and configured."""
-    from yt_brain.application.doctor import CheckStatus, run_doctor
+    from yt_brain.application.surgeon import CheckStatus, run_surgeon
     from yt_brain.infrastructure.config import load_config
 
     config = load_config()
     db_path = config.db_path
 
-    results = run_doctor(
+    results = run_surgeon(
         youtube_api_key=config.youtube_api_key,
         anthropic_api_key=config.anthropic_api_key,
         db_path=db_path,
@@ -606,47 +606,47 @@ def doctor() -> None:
 - [ ] **Step 6: Write CLI integration test**
 
 ```python
-# append to tests/test_doctor.py
-class TestDoctorCli:
-    def test_doctor_runs(self, temp_config_dir):
+# append to tests/test_surgeon.py
+class TestSurgeonCli:
+    def test_surgeon_runs(self, temp_config_dir):
         from typer.testing import CliRunner
 
         from yt_brain.cli import app
 
         runner = CliRunner()
         with (
-            patch("yt_brain.application.doctor.SQLITE_VEC_AVAILABLE", True),
+            patch("yt_brain.application.surgeon.SQLITE_VEC_AVAILABLE", True),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
             ),
-            patch("yt_brain.application.doctor.urllib.request.urlopen") as mock_url,
+            patch("yt_brain.application.surgeon.urllib.request.urlopen") as mock_url,
         ):
             mock_resp = MagicMock()
             mock_resp.read.return_value = json.dumps({"items": []}).encode()
             mock_resp.__enter__ = lambda s: s
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_url.return_value = mock_resp
-            result = runner.invoke(app, ["doctor"])
+            result = runner.invoke(app, ["surgeon"])
 
         assert "prerequisites check" in result.output
         assert "sqlite-vec" in result.output
         assert "yt-dlp" in result.output
 
-    def test_doctor_exit_code_1_on_failure(self, temp_config_dir):
+    def test_surgeon_exit_code_1_on_failure(self, temp_config_dir):
         from typer.testing import CliRunner
 
         from yt_brain.cli import app
 
         runner = CliRunner()
         with (
-            patch("yt_brain.application.doctor.SQLITE_VEC_AVAILABLE", False),
+            patch("yt_brain.application.surgeon.SQLITE_VEC_AVAILABLE", False),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 side_effect=FileNotFoundError,
             ),
         ):
-            result = runner.invoke(app, ["doctor"])
+            result = runner.invoke(app, ["surgeon"])
 
         assert result.exit_code == 1
         assert "issue(s) found" in result.output
@@ -654,19 +654,19 @@ class TestDoctorCli:
 
 - [ ] **Step 7: Run full test suite**
 
-Run: `uv run pytest tests/test_doctor.py -v`
+Run: `uv run pytest tests/test_surgeon.py -v`
 Expected: All PASS
 
 - [ ] **Step 8: Run lint and type check**
 
-Run: `uv run ruff check src/yt_brain/application/doctor.py tests/test_doctor.py && uv run mypy src/yt_brain/application/doctor.py`
+Run: `uv run ruff check src/yt_brain/application/surgeon.py tests/test_surgeon.py && uv run mypy src/yt_brain/application/surgeon.py`
 Expected: Clean
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/yt_brain/application/doctor.py tests/test_doctor.py src/yt_brain/cli.py
-git commit -m "Add yt-brain doctor CLI command for prerequisite checking"
+git add src/yt_brain/application/surgeon.py tests/test_surgeon.py src/yt_brain/cli.py
+git commit -m "Add yt-brain surgeon CLI command for prerequisite checking"
 ```
 
 ---
@@ -710,7 +710,7 @@ Note: If `build` is not available, install it first: `uv run pip install build`.
 - [ ] **Step 3: Verify the wheel installs and `yt-brain` entry point works**
 
 Run: `uv run pip install dist/yt_brain-0.1.0-py3-none-any.whl --force-reinstall && uv run yt-brain --help`
-Expected: Help text shows all commands including `doctor`
+Expected: Help text shows all commands including `surgeon`
 
 - [ ] **Step 4: Commit**
 
@@ -894,10 +894,10 @@ You should see: `Ingested <N> videos from Takeout.` where N is typically hundred
 
 ## 4. Verify Setup
 
-Run the doctor command to check everything is configured:
+Run the surgeon command to check everything is configured:
 
 ```bash
-yt-brain doctor
+yt-brain surgeon
 ```
 
 All critical checks should show ✅. Fix any ❌ items using the instructions above.
@@ -1014,7 +1014,7 @@ pip install yt-brain
 | `embed [--rebuild]` | Generate semantic embeddings for search |
 | `cluster [--rebuild]` | Run topic clustering on embedded videos |
 | `dashboard [--port 5555]` | Launch web dashboard |
-| `doctor` | Check that prerequisites are installed and configured |
+| `surgeon` | Check that prerequisites are installed and configured |
 | `status` | Show video counts by engagement tier |
 | `classify` | Run engagement classification |
 | `backfill-channels` | Fill missing channel names |
@@ -1126,12 +1126,12 @@ Expected: All tests pass
 Run: `uv run ruff check src/ tests/ && uv run mypy`
 Expected: Clean
 
-- [ ] **Step 3: Verify `yt-brain doctor` works end-to-end**
+- [ ] **Step 3: Verify `yt-brain surgeon` works end-to-end**
 
-Run: `uv run yt-brain doctor`
+Run: `uv run yt-brain surgeon`
 Expected: See formatted output with status of all 6 checks
 
-- [ ] **Step 4: Verify `yt-brain --help` shows doctor command**
+- [ ] **Step 4: Verify `yt-brain --help` shows surgeon command**
 
 Run: `uv run yt-brain --help`
-Expected: `doctor` appears in command list
+Expected: `surgeon` appears in command list

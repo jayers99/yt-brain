@@ -512,15 +512,15 @@ def config() -> None:
 
 
 @app.command()
-def doctor() -> None:
+def surgeon() -> None:
     """Check that all prerequisites are installed and configured."""
-    from yt_brain.application.doctor import CheckStatus, run_doctor
+    from yt_brain.application.surgeon import CheckStatus, run_surgeon
     from yt_brain.infrastructure.config import load_config
 
     config = load_config()
     db_path = config.db_path
 
-    results = run_doctor(
+    results = run_surgeon(
         youtube_api_key=config.youtube_api_key,
         anthropic_api_key=config.anthropic_api_key,
         db_path=db_path,

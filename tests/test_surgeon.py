@@ -7,7 +7,7 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from yt_brain.application.doctor import (
+from yt_brain.application.surgeon import (
     CheckResult,
     CheckStatus,
     check_anthropic_api_key,
@@ -16,7 +16,7 @@ from yt_brain.application.doctor import (
     check_sqlite_vec,
     check_youtube_api_key,
     check_ytdlp,
-    run_doctor,
+    run_surgeon,
 )
 
 
@@ -217,16 +217,16 @@ class TestCheckDatabase:
         assert "1,001 videos" in result.detail
 
 
-class TestRunDoctor:
+class TestRunSurgeon:
     def test_returns_all_checks(self, temp_db):
         with (
             patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
             ),
         ):
-            results = run_doctor(
+            results = run_surgeon(
                 youtube_api_key="",
                 anthropic_api_key="",
                 db_path=temp_db,
@@ -244,11 +244,11 @@ class TestRunDoctor:
         with (
             patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 side_effect=FileNotFoundError,
             ),
         ):
-            results = run_doctor(
+            results = run_surgeon(
                 youtube_api_key="",
                 anthropic_api_key="",
                 db_path=temp_db,
@@ -257,8 +257,8 @@ class TestRunDoctor:
         assert len(failures) >= 2
 
 
-class TestDoctorCli:
-    def test_doctor_runs(self, temp_config_dir):
+class TestSurgeonCli:
+    def test_surgeon_runs(self, temp_config_dir):
         from typer.testing import CliRunner
 
         from yt_brain.cli import app
@@ -267,23 +267,23 @@ class TestDoctorCli:
         with (
             patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
             ),
-            patch("yt_brain.application.doctor.urllib.request.urlopen") as mock_url,
+            patch("yt_brain.application.surgeon.urllib.request.urlopen") as mock_url,
         ):
             mock_resp = MagicMock()
             mock_resp.read.return_value = json.dumps({"items": []}).encode()
             mock_resp.__enter__ = lambda s: s
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_url.return_value = mock_resp
-            result = runner.invoke(app, ["doctor"])
+            result = runner.invoke(app, ["surgeon"])
 
         assert "prerequisites check" in result.output
         assert "sqlite-vec" in result.output
         assert "yt-dlp" in result.output
 
-    def test_doctor_exit_code_1_on_failure(self, temp_config_dir):
+    def test_surgeon_exit_code_1_on_failure(self, temp_config_dir):
         from typer.testing import CliRunner
 
         from yt_brain.cli import app
@@ -292,16 +292,16 @@ class TestDoctorCli:
         with (
             patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 side_effect=FileNotFoundError,
             ),
         ):
-            result = runner.invoke(app, ["doctor"])
+            result = runner.invoke(app, ["surgeon"])
 
         assert result.exit_code == 1
         assert "issue(s) found" in result.output
 
-    def test_doctor_exit_code_0_on_success(self, temp_config_dir):
+    def test_surgeon_exit_code_0_on_success(self, temp_config_dir):
         from typer.testing import CliRunner
 
         from yt_brain.cli import app
@@ -315,10 +315,10 @@ class TestDoctorCli:
         with (
             patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
             ),
-            patch("yt_brain.application.doctor.urllib.request.urlopen", return_value=mock_resp),
+            patch("yt_brain.application.surgeon.urllib.request.urlopen", return_value=mock_resp),
             patch("yt_brain.infrastructure.config.load_config") as mock_cfg,
         ):
             cfg = MagicMock()
@@ -326,12 +326,12 @@ class TestDoctorCli:
             cfg.anthropic_api_key = "sk-ant-fake"
             cfg.db_path = temp_config_dir / "yt-brain.db"
             mock_cfg.return_value = cfg
-            result = runner.invoke(app, ["doctor"])
+            result = runner.invoke(app, ["surgeon"])
 
         assert result.exit_code == 0
         assert "All prerequisites OK" in result.output
 
-    def test_doctor_warnings_only(self, temp_config_dir):
+    def test_surgeon_warnings_only(self, temp_config_dir):
         """Warnings-only (no FAIL) exits 0 and reports warning count."""
         from typer.testing import CliRunner
 
@@ -346,10 +346,10 @@ class TestDoctorCli:
         with (
             patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
             patch(
-                "yt_brain.application.doctor.subprocess.run",
+                "yt_brain.application.surgeon.subprocess.run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
             ),
-            patch("yt_brain.application.doctor.urllib.request.urlopen", return_value=mock_resp),
+            patch("yt_brain.application.surgeon.urllib.request.urlopen", return_value=mock_resp),
             patch("yt_brain.infrastructure.config.load_config") as mock_cfg,
         ):
             cfg = MagicMock()
@@ -357,7 +357,7 @@ class TestDoctorCli:
             cfg.anthropic_api_key = ""
             cfg.db_path = temp_config_dir / "yt-brain.db"
             mock_cfg.return_value = cfg
-            result = runner.invoke(app, ["doctor"])
+            result = runner.invoke(app, ["surgeon"])
 
         assert result.exit_code == 0
         assert "warning(s)" in result.output
