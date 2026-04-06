@@ -211,3 +211,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Secrets / credentials
+config.yaml
+*.key
+*.pem
+.secrets.*
+!.secrets.baseline
