@@ -29,7 +29,7 @@ def check_sqlite_vec() -> CheckResult:
 
     if SQLITE_VEC_AVAILABLE:
         return CheckResult("sqlite-vec", CheckStatus.OK, "loaded")
-    return CheckResult("sqlite-vec", CheckStatus.FAIL, "not available — run: uv sync")
+    return CheckResult("sqlite-vec", CheckStatus.FAIL, "not available — reinstall with: pip install sqlite-vec")
 
 
 def check_ytdlp() -> CheckResult:
@@ -41,7 +41,11 @@ def check_ytdlp() -> CheckResult:
             timeout=10,
         )
         version = result.stdout.strip()
-        return CheckResult("yt-dlp", CheckStatus.OK, version)
+        if result.returncode == 0 and version:
+            return CheckResult("yt-dlp", CheckStatus.OK, version)
+        error = result.stderr.strip()
+        detail = error or version or f"yt-dlp exited with status {result.returncode}"
+        return CheckResult("yt-dlp", CheckStatus.FAIL, detail)
     except FileNotFoundError:
         return CheckResult("yt-dlp", CheckStatus.FAIL, "not found — install yt-dlp")
     except Exception as exc:  # noqa: BLE001
@@ -100,12 +104,7 @@ def check_database(db_path: Path) -> CheckResult:
         parts = [f"{video_count:,} videos"]
 
         if "video_embeddings" in tables:
-            from yt_brain.infrastructure.database import SQLITE_VEC_AVAILABLE, _load_sqlite_vec
-
-            if SQLITE_VEC_AVAILABLE:
-                _load_sqlite_vec(conn)
-                (emb_count,) = conn.execute("SELECT COUNT(*) FROM video_embeddings").fetchone()
-                parts.append(f"{emb_count:,} embeddings")
+            parts.append("embeddings table present")
 
         if "video_clusters" in tables:
             (cluster_count,) = conn.execute("SELECT COUNT(*) FROM video_clusters").fetchone()

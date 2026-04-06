@@ -31,7 +31,7 @@ class TestCheckSqliteVec:
         with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", False):
             result = check_sqlite_vec()
         assert result.status == CheckStatus.FAIL
-        assert "uv sync" in result.detail
+        assert "pip install sqlite-vec" in result.detail
 
     def test_returns_check_result(self):
         with patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True):
@@ -43,6 +43,7 @@ class TestCheckYtdlp:
     def test_ok_with_version(self):
         mock_run = MagicMock()
         mock_run.return_value.stdout = "2024.1.1\n"
+        mock_run.return_value.returncode = 0
         with patch("subprocess.run", mock_run):
             result = check_ytdlp()
         assert result.status == CheckStatus.OK
@@ -62,6 +63,7 @@ class TestCheckYtdlp:
     def test_name_is_ytdlp(self):
         mock_run = MagicMock()
         mock_run.return_value.stdout = "2024.1.1\n"
+        mock_run.return_value.returncode = 0
         with patch("subprocess.run", mock_run):
             result = check_ytdlp()
         assert result.name == "yt-dlp"
@@ -298,3 +300,64 @@ class TestDoctorCli:
 
         assert result.exit_code == 1
         assert "issue(s) found" in result.output
+
+    def test_doctor_exit_code_0_on_success(self, temp_config_dir):
+        from typer.testing import CliRunner
+
+        from yt_brain.cli import app
+
+        runner = CliRunner()
+        payload = json.dumps({"items": [{"id": "dQw4w9WgXcQ"}]}).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = payload
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        with (
+            patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
+            patch(
+                "yt_brain.application.doctor.subprocess.run",
+                return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
+            ),
+            patch("yt_brain.application.doctor.urllib.request.urlopen", return_value=mock_resp),
+            patch("yt_brain.infrastructure.config.load_config") as mock_cfg,
+        ):
+            cfg = MagicMock()
+            cfg.youtube_api_key = "fake-key"
+            cfg.anthropic_api_key = "sk-ant-fake"
+            cfg.db_path = temp_config_dir / "yt-brain.db"
+            mock_cfg.return_value = cfg
+            result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        assert "All prerequisites OK" in result.output
+
+    def test_doctor_warnings_only(self, temp_config_dir):
+        """Warnings-only (no FAIL) exits 0 and reports warning count."""
+        from typer.testing import CliRunner
+
+        from yt_brain.cli import app
+
+        runner = CliRunner()
+        payload = json.dumps({"items": [{"id": "dQw4w9WgXcQ"}]}).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = payload
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        with (
+            patch("yt_brain.infrastructure.database.SQLITE_VEC_AVAILABLE", True),
+            patch(
+                "yt_brain.application.doctor.subprocess.run",
+                return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="2024.12.1"),
+            ),
+            patch("yt_brain.application.doctor.urllib.request.urlopen", return_value=mock_resp),
+            patch("yt_brain.infrastructure.config.load_config") as mock_cfg,
+        ):
+            cfg = MagicMock()
+            cfg.youtube_api_key = "fake-key"
+            cfg.anthropic_api_key = ""
+            cfg.db_path = temp_config_dir / "yt-brain.db"
+            mock_cfg.return_value = cfg
+            result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        assert "warning(s)" in result.output

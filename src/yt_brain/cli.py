@@ -546,7 +546,10 @@ def doctor() -> None:
 
     console.print()
     if failures:
-        console.print(f"[red]❌ {len(failures)} issue(s) found. See INSTALL.md for setup instructions.[/red]")
+        console.print(
+            f"[red]❌ {len(failures)} issue(s) found. "
+            "See https://github.com/jayers99/yt-brain/blob/main/INSTALL.md[/red]"
+        )
         raise typer.Exit(1)
     elif warnings:
         console.print(f"[yellow]⚠️  {len(warnings)} warning(s). Everything critical is OK.[/yellow]")
