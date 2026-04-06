@@ -457,7 +457,7 @@ def get_embedding_count(db_path: Path) -> int:
     _load_sqlite_vec(conn)
     try:
         cursor = conn.execute("SELECT COUNT(*) FROM video_embeddings")
-        return cursor.fetchone()[0]
+        return int(cursor.fetchone()[0])
     finally:
         conn.close()
 
@@ -471,7 +471,7 @@ def save_cluster(db_path: Path, cluster: Cluster) -> int:
             (cluster.slug, cluster.centroid),
         )
         conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
     finally:
         conn.close()
 

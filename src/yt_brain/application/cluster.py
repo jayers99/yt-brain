@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import struct
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -188,7 +189,7 @@ def cluster_videos(
     db_path: Path,
     api_key: str,
     min_cluster_size: int = DEFAULT_MIN_CLUSTER_SIZE,
-    on_progress: callable | None = None,
+    on_progress: Callable[..., None] | None = None,
 ) -> int:
     """Full rebuild: cluster all embedded videos with HDBSCAN.
 

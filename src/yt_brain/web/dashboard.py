@@ -30,6 +30,7 @@ _EMOJI_RE = re.compile(
 
 from flask import Flask, jsonify, render_template_string, request, send_from_directory
 
+from yt_brain.domain.models import Video
 from yt_brain.infrastructure.config import load_config
 from yt_brain.infrastructure.database import (
     SQLITE_VEC_AVAILABLE,
@@ -45,7 +46,7 @@ from yt_brain.infrastructure.database import (
 from .classifier import classify_genre, genre_stats
 
 
-def is_removed_video(video: "Video") -> bool:
+def is_removed_video(video: Video) -> bool:
     """Return True if the video was removed/private on YouTube.
 
     Detected by Takeout storing the raw URL as the title when YouTube

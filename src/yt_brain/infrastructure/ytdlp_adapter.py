@@ -168,7 +168,7 @@ def parse_ytdlp_metadata(metadata: dict) -> Video:
 
 
 def _extract_text_from_subs(sub_data: list[dict]) -> str:
-    lines = []
+    lines: list[str] = []
     for event in sub_data:
         text = event.get("text", "").strip()
         if text and text not in lines[-1:]:

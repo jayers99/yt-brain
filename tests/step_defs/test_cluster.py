@@ -1,10 +1,8 @@
 import struct
 from pathlib import Path
 
-import pytest
 
 from yt_brain.infrastructure.database import (
-    init_db,
     save_video,
     save_cluster,
     get_cluster_by_slug,

@@ -124,7 +124,7 @@ def history(
     console.print(table)
 
     if save:
-        from yt_brain.infrastructure.database import init_db, save_video
+        from yt_brain.infrastructure.database import save_video
 
         db_path = _get_db_path()
         _ensure_db(db_path)
@@ -159,7 +159,7 @@ def history(
                     pass
             console.print(f"[green]Backfilled {filled}/{len(missing)} channel names.[/green]")
     else:
-        console.print(f"\n[dim]Use --save to add these to your brain.[/dim]")
+        console.print("\n[dim]Use --save to add these to your brain.[/dim]")
 
 
 @app.command()

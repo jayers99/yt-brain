@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from urllib.error import URLError
 
@@ -94,7 +95,7 @@ def backfill_descriptions(
     db_path: Path,
     api_key: str,
     limit: int | None = None,
-    on_progress: callable | None = None,
+    on_progress: Callable[..., None] | None = None,
 ) -> int:
     """Backfill missing video descriptions via YouTube Data API (batches of 50).
 
@@ -138,7 +139,7 @@ def backfill_likes(db_path: Path, browser: str = "chrome") -> int:
     matched = liked_ids & all_ids
 
     if matched:
-        liked_map = {vid: "like" for vid in matched}
+        liked_map: dict[str, str | None] = {vid: "like" for vid in matched}
         bulk_update_liked(db_path, liked_map)
 
     return len(matched)

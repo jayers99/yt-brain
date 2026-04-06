@@ -3,22 +3,15 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest
 
 from yt_brain.application.cluster import (
-    ASSIGNMENT_THRESHOLD,
     _blob_to_array,
     _compute_centroid,
     _generate_slug,
     _slugify,
-    cluster_videos,
-    assign_new_videos,
 )
 from yt_brain.domain.models import EngagementLevel, Source, Video
 from yt_brain.infrastructure.database import (
-    get_clusters_with_counts,
-    get_video_cluster_slug,
-    init_db,
     insert_embeddings,
     save_video,
 )
