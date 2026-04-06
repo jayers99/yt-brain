@@ -61,7 +61,34 @@ def load_config() -> YtBrainConfig:
         if "transcript_language" in data:
             config.transcript_language = data["transcript_language"]
 
+    # Environment variables override config file
+    env_yt = os.environ.get("YOUTUBE_API_KEY")
+    if env_yt:
+        config.youtube_api_key = env_yt
+    env_ant = os.environ.get("ANTHROPIC_API_KEY")
+    if env_ant:
+        config.anthropic_api_key = env_ant
+
     return config
+
+
+def require_api_key(config: YtBrainConfig, key_name: str) -> str:
+    """Get a required API key or raise ConfigError with setup instructions."""
+    from yt_brain.domain.errors import ConfigError
+
+    value = getattr(config, key_name, "")
+    if not value:
+        env_var = {
+            "youtube_api_key": "YOUTUBE_API_KEY",
+            "anthropic_api_key": "ANTHROPIC_API_KEY",
+        }.get(key_name, key_name.upper())
+
+        raise ConfigError(
+            f"Missing {key_name}. Set it via:\n"
+            f"  1. Environment variable: export {env_var}=<your-key>\n"
+            f"  2. Config file: ~/.config/yt-brain/config.yaml"
+        )
+    return value
 
 
 def save_config(config: YtBrainConfig) -> None:
