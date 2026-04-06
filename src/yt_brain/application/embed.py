@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import struct
+from collections.abc import Callable
 from pathlib import Path
 
 from yt_brain.infrastructure.database import (
@@ -21,7 +22,7 @@ def _to_blob(embedding: list[float]) -> bytes:
 def embed_videos(
     db_path: Path,
     rebuild: bool = False,
-    on_progress: callable | None = None,
+    on_progress: Callable[..., None] | None = None,
 ) -> int:
     """Generate embeddings for videos and store in sqlite-vec.
 
@@ -45,7 +46,7 @@ def embed_videos(
 
         embeddings = model.encode(texts, show_progress_bar=False)
 
-        rows = [(vid_id, _to_blob(emb.tolist())) for vid_id, emb in zip(ids, embeddings)]
+        rows = [(vid_id, _to_blob(emb.tolist())) for vid_id, emb in zip(ids, embeddings, strict=True)]
         insert_embeddings(db_path, rows)
 
         embedded += len(batch)

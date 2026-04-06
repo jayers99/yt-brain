@@ -1,3 +1,5 @@
+[![CI](https://github.com/jayers99/yt-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/jayers99/yt-brain/actions/workflows/ci.yml)
+
 # yt-brain
 
 Turn passive YouTube watching into active knowledge.
@@ -109,6 +111,28 @@ To enable AI-powered cluster naming (optional):
 uv sync --extra ai
 ```
 
+Alternatively, install with pip into any existing environment:
+
+```bash
+pip install .
+```
+
+### Makefile
+
+A `Makefile` is included for common dev tasks:
+
+| Target | Command |
+|--------|---------|
+| `make install` | `uv sync` — install core dependencies |
+| `make dev` | `uv sync --dev --extra ai` — install all dev + optional deps |
+| `make test` | `uv run pytest -v` |
+| `make lint` | `uv run ruff check src/ tests/` |
+| `make typecheck` | `uv run mypy` |
+| `make run` | `uv run yt-brain dashboard` |
+| `make clean` | Remove `__pycache__`, caches, build artifacts |
+
+Run `make` with no arguments to see available targets.
+
 ### Google Takeout (recommended starting point)
 
 1. Go to [takeout.google.com](https://takeout.google.com)
@@ -176,12 +200,20 @@ Data stored in SQLite at `~/.config/yt-brain/yt-brain.db`.
 
 ## Troubleshooting
 
-### "No module named 'sqlite_vec'"
+### sqlite-vec installation issues
 
-sqlite-vec is a native extension. If installation fails:
-- **macOS**: `brew install sqlite` first, then `uv sync`
-- **Linux**: ensure `libsqlite3-dev` is installed
-- If problems persist, embeddings and clustering features will be unavailable but all other features work
+sqlite-vec is a native SQLite extension used for semantic search and clustering. **It is optional** -- all other features (ingest, classify, review, dashboard, etc.) work without it. If sqlite-vec fails to install or load:
+
+- **macOS (Apple Silicon)**: Usually works out of the box with `uv sync`. If not, try `brew install sqlite` first.
+- **macOS (Intel)**: `brew install sqlite && uv sync`
+- **Linux (x86_64)**: Ensure `libsqlite3-dev` is installed (`apt install libsqlite3-dev`), then `uv sync`
+- **Linux (ARM/other)**: Pre-built wheels may not be available. Install from source: `pip install sqlite-vec --no-binary sqlite-vec`
+- **Windows**: Pre-built wheels are available for x86_64. If installation fails, try `pip install sqlite-vec --no-binary sqlite-vec`
+
+When sqlite-vec is unavailable:
+- `yt-brain embed` and `yt-brain cluster` will print a clear error message
+- Dashboard search falls back to text-based (LIKE) queries instead of semantic search
+- All other commands work normally
 
 ### "Could not extract cookies" / sync fails
 

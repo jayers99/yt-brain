@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 from typing import Annotated
 
@@ -124,7 +125,7 @@ def history(
     console.print(table)
 
     if save:
-        from yt_brain.infrastructure.database import init_db, save_video
+        from yt_brain.infrastructure.database import save_video
 
         db_path = _get_db_path()
         _ensure_db(db_path)
@@ -159,7 +160,7 @@ def history(
                     pass
             console.print(f"[green]Backfilled {filled}/{len(missing)} channel names.[/green]")
     else:
-        console.print(f"\n[dim]Use --save to add these to your brain.[/dim]")
+        console.print("\n[dim]Use --save to add these to your brain.[/dim]")
 
 
 @app.command()
@@ -243,7 +244,7 @@ def fetch(
     import json as _json
     import re
     import urllib.request
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from urllib.error import URLError
 
     from yt_brain.infrastructure.config import load_config as _load_config
@@ -261,7 +262,7 @@ def fetch(
         raise typer.Exit(1)
 
     years = int(match.group(1))
-    cutoff = datetime.now(timezone.utc) - timedelta(days=years * 365)
+    cutoff = datetime.now(UTC) - timedelta(days=years * 365)
     console.print(f"[dim]Fetching watch history back to {cutoff.strftime('%b %Y')}...[/dim]")
 
     config = _load_config()
@@ -540,6 +541,13 @@ def embed(
     rebuild: Annotated[bool, typer.Option("--rebuild", help="Regenerate all embeddings")] = False,
 ) -> None:
     """Generate semantic embeddings for video titles and descriptions."""
+    from yt_brain.infrastructure.database import SQLITE_VEC_AVAILABLE
+
+    if not SQLITE_VEC_AVAILABLE:
+        console.print("[red]sqlite-vec is not installed. Embedding and clustering features are unavailable.[/red]")
+        console.print("[dim]Install with: uv sync  (or pip install sqlite-vec)[/dim]")
+        raise typer.Exit(1)
+
     from yt_brain.application.embed import embed_videos
     from yt_brain.infrastructure.database import get_embedding_count, get_videos_for_embedding
 
@@ -576,6 +584,13 @@ def cluster_default(
     """Run video clustering (incremental by default, --rebuild for full)."""
     if ctx.invoked_subcommand is not None:
         return
+
+    from yt_brain.infrastructure.database import SQLITE_VEC_AVAILABLE
+
+    if not SQLITE_VEC_AVAILABLE:
+        console.print("[red]sqlite-vec is not installed. Embedding and clustering features are unavailable.[/red]")
+        console.print("[dim]Install with: uv sync  (or pip install sqlite-vec)[/dim]")
+        raise typer.Exit(1)
 
     from yt_brain.infrastructure.config import load_config
     from yt_brain.infrastructure.database import get_embedding_count
@@ -685,7 +700,9 @@ def backfill_descriptions(
         return
 
     target = min(missing_count, limit) if limit else missing_count
-    console.print(f"[dim]Backfilling descriptions for {target}/{missing_count} videos via YouTube API (batches of 50)...[/dim]")
+    console.print(
+        f"[dim]Backfilling descriptions for {target}/{missing_count} videos via YouTube API (batches of 50)...[/dim]"
+    )
 
     def on_progress(done: int, total: int) -> None:
         console.print(f"  [dim]{done}/{total}[/dim]")

@@ -74,7 +74,8 @@ def api_available(ctx):
 def run_sync(ctx):
     from yt_brain.application.sync import sync_videos
 
-    with patch("yt_brain.application.sync.fetch_history_range", return_value=ctx.ytdlp_entries):
+    with patch("yt_brain.application.sync.fetch_history_range", return_value=ctx.ytdlp_entries), \
+         patch("yt_brain.application.sync.backfill_likes", return_value=0):
         ctx.sync_result = sync_videos(ctx.db_path, batch_size=len(ctx.ytdlp_entries))
 
 
@@ -83,7 +84,8 @@ def run_sync_with_api(ctx):
     from yt_brain.application.sync import sync_videos
 
     with patch("yt_brain.application.sync.fetch_history_range", return_value=ctx.ytdlp_entries), \
-         patch("yt_brain.application.backfill.urllib.request.urlopen") as mock_urlopen:
+         patch("yt_brain.application.backfill.urllib.request.urlopen") as mock_urlopen, \
+         patch("yt_brain.application.sync.backfill_likes", return_value=0):
         import json
         mock_urlopen.return_value.__enter__ = lambda s: s
         mock_urlopen.return_value.__exit__ = lambda s, *a: None

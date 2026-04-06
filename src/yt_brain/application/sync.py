@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from yt_brain.application.backfill import backfill_categories, backfill_channels, backfill_dates, backfill_likes
-from yt_brain.infrastructure.database import get_existing_video_ids, get_existing_video_watched_at, save_video, update_watched_at
+from yt_brain.infrastructure.database import (
+    get_existing_video_ids,
+    get_existing_video_watched_at,
+    save_video,
+    update_watched_at,
+)
 from yt_brain.infrastructure.ytdlp_adapter import fetch_history_range, parse_ytdlp_metadata
 
 
@@ -35,7 +40,7 @@ def sync_videos(
     all_new_ids: list[str] = []
     rewatched_ids: list[str] = []
     start = 1
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     while True:
         end = start + batch_size - 1

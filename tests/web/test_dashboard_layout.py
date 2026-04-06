@@ -72,6 +72,8 @@ def test_semantic_search_no_overflow(sized_page: Page):
     """Typing in the semantic search bar must not cause layout overflow."""
     search_input = sized_page.locator("#semanticSearch")
     expect(search_input).to_be_visible()
+    if search_input.is_disabled():
+        pytest.skip("Semantic search disabled (no embeddings)")
 
     for length in range(1, 21):
         text = "a" * length
@@ -85,6 +87,8 @@ def test_semantic_search_with_spaces_no_overflow(sized_page: Page):
     """Typing 'web ' (with trailing space) must not cause layout overflow."""
     search_input = sized_page.locator("#semanticSearch")
     expect(search_input).to_be_visible()
+    if search_input.is_disabled():
+        pytest.skip("Semantic search disabled (no embeddings)")
 
     test_strings = ["w", "we", "web", "web ", "web d", "web de", "web dev",
                     "web dev ", "web development"]

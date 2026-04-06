@@ -1,6 +1,7 @@
 """Test that removed/private videos are filtered from dashboard data."""
 
 from datetime import datetime
+
 from yt_brain.domain.models import Video
 
 

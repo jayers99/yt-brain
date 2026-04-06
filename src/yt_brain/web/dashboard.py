@@ -8,6 +8,23 @@ import sqlite3
 from collections import Counter
 from pathlib import Path
 
+from flask import Flask, Response, jsonify, render_template_string, request, send_from_directory
+
+from yt_brain.domain.models import Video
+from yt_brain.infrastructure.config import load_config
+from yt_brain.infrastructure.database import (
+    SQLITE_VEC_AVAILABLE,
+    get_all_videos,
+    get_channel_urls,
+    get_embedding_count,
+    get_starred_channels,
+    init_db,
+    search_similar,
+    toggle_starred_channel,
+)
+
+from .classifier import classify_genre, genre_stats
+
 _EMOJI_RE = re.compile(
     "["
     "\U0001f600-\U0001f64f"  # emoticons
@@ -28,23 +45,8 @@ _EMOJI_RE = re.compile(
     flags=re.UNICODE,
 )
 
-from flask import Flask, jsonify, render_template_string, request, send_from_directory
 
-from yt_brain.infrastructure.config import load_config
-from yt_brain.infrastructure.database import (
-    get_all_videos,
-    get_channel_urls,
-    get_embedding_count,
-    get_starred_channels,
-    init_db,
-    search_similar,
-    toggle_starred_channel,
-)
-
-from .classifier import classify_genre, genre_stats
-
-
-def is_removed_video(video: "Video") -> bool:
+def is_removed_video(video: Video) -> bool:
     """Return True if the video was removed/private on YouTube.
 
     Detected by Takeout storing the raw URL as the title when YouTube
@@ -1443,6 +1445,25 @@ GENRE_COLORS = {
 }
 
 
+def _text_search(db_path: Path, query: str, limit: int) -> tuple[Response, int]:
+    """Fall back to SQL LIKE search when sqlite-vec is unavailable."""
+    conn = sqlite3.connect(db_path)
+    try:
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        rows = conn.execute(
+            "SELECT youtube_id FROM videos "
+            "WHERE title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' "
+            "OR channel_id LIKE ? ESCAPE '\\' "
+            "ORDER BY watched_at DESC LIMIT ?",
+            (pattern, pattern, pattern, limit),
+        ).fetchall()
+        results = [{"youtube_id": row[0]} for row in rows]
+        return jsonify({"results": results, "mode": "text"}), 200
+    finally:
+        conn.close()
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
 
@@ -1564,7 +1585,10 @@ def create_app() -> Flask:
             count = sum(1 for v in videos if lo <= (v["duration"] or 0) < hi)
             duration_buckets.append({"label": label, "count": count})
 
-        has_embeddings = get_embedding_count(config.db_path) > 0
+        try:
+            has_embeddings = SQLITE_VEC_AVAILABLE and get_embedding_count(config.db_path) > 0
+        except Exception:
+            has_embeddings = False
         clustered_count = sum(1 for v in videos if v["cluster"])
         clustered_pct = round(clustered_count / total * 100) if total else 0
 
@@ -1595,7 +1619,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/images/<path:filename>")
-    def serve_image(filename: str):
+    def serve_image(filename: str) -> Response:
         images_dir = Path(__file__).parent / "static" / "images"
         return send_from_directory(images_dir, filename)
 
@@ -1612,13 +1636,18 @@ def create_app() -> Flask:
 
     # Preload embedding model at startup if embeddings exist
     config = load_config()
-    if get_embedding_count(config.db_path) > 0:
-        import struct as _struct
+    _vec_ok = SQLITE_VEC_AVAILABLE
+    if _vec_ok:
+        try:
+            if get_embedding_count(config.db_path) > 0:
+                import struct as _struct
 
-        from sentence_transformers import SentenceTransformer as _ST
+                from sentence_transformers import SentenceTransformer as _ST
 
-        app._embed_model = _ST("all-MiniLM-L6-v2")
-        app._struct = _struct
+                app._embed_model = _ST("all-MiniLM-L6-v2")
+                app._struct = _struct
+        except Exception:
+            _vec_ok = False
 
     @app.route("/api/search")
     def api_search():
@@ -1633,7 +1662,8 @@ def create_app() -> Flask:
             return jsonify({"results": []})
 
         if not hasattr(app, "_embed_model"):
-            return jsonify({"results": [], "error": "No embeddings. Run: yt-brain embed"}), 200
+            # Fall back to text-based LIKE search
+            return _text_search(config.db_path, q, limit)
 
         # Extract field-specific filters: title:"x", desc:"x", channel:"x"
         # and bare quoted terms: "x" (matches title or description)
@@ -1672,11 +1702,7 @@ def create_app() -> Flask:
 
                     ok = True
                     for field, term in field_filters:
-                        if field == "title" and term not in title_l:
-                            ok = False
-                        elif field == "desc" and term not in desc_l:
-                            ok = False
-                        elif field == "channel" and term not in channel_l:
+                        if field == "title" and term not in title_l or field == "desc" and term not in desc_l or field == "channel" and term not in channel_l:
                             ok = False
                     for term in bare_quotes:
                         if term not in title_l and term not in desc_l:
