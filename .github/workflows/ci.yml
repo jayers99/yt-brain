@@ -24,7 +24,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install yt-dlp
-        run: pipx install yt-dlp
+        run: uv tool install yt-dlp
 
       - name: Install dependencies
         run: uv sync --dev
