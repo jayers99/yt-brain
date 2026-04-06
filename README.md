@@ -172,6 +172,41 @@ src/yt_brain/
 
 Data stored in SQLite at `~/.config/yt-brain/yt-brain.db`.
 
+## Troubleshooting
+
+### "No module named 'sqlite_vec'"
+
+sqlite-vec is a native extension. If installation fails:
+- **macOS**: `brew install sqlite` first, then `uv sync`
+- **Linux**: ensure `libsqlite3-dev` is installed
+- If problems persist, embeddings and clustering features will be unavailable but all other features work
+
+### "Could not extract cookies" / sync fails
+
+- Ensure you're logged into YouTube in your browser
+- macOS: grant Full Disk Access to your terminal app (System Settings > Privacy & Security)
+- Try a different browser: `yt-brain sync --browser firefox`
+
+### "Missing youtube_api_key"
+
+Set your API key via environment variable or config file. See [API Keys](#api-keys-optional) above.
+
+### "Not enough videos to cluster"
+
+You need at least 10 videos with embeddings. Run `yt-brain embed` first, then `yt-brain cluster --rebuild`.
+
+### Config location
+
+All data is stored in `~/.config/yt-brain/`:
+- `config.yaml` — API keys, thresholds
+- `yt-brain.db` — SQLite database with all video data
+
+Override with: `export YT_BRAIN_CONFIG_DIR=/path/to/dir`
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
 ## License
 
 MIT
