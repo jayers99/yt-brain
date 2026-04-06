@@ -15,9 +15,11 @@ dependencies = [
     "sentence-transformers>=3.4.1",
     "sqlite-vec>=0.1.6",
     "hdbscan>=0.8.40",
-    "anthropic>=0.42.0",
     "numpy>=1.26.0",
 ]
+
+[project.optional-dependencies]
+ai = ["anthropic>=0.42.0"]
 
 [project.scripts]
 yt-brain = "yt_brain.cli:app"
